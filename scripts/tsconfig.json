@@ -1,0 +1,21 @@
+{
+	"buildOnSave": false, // 保存時にビルドしない
+	"compileOnSave": false, // 保存時にコンパイルしない
+	// コンパイルオプション
+	"compilerOptions": {
+		"allowJs": true, // JavaScript ファイルをコンパイル対象にする
+		"checkJs": true, // JavaScript ファイルの型整合性などをチェック
+		"declaration": true, // 型定義ファイルを出力する
+		"emitDeclarationOnly": true, // 型定義ファイルのみを出力する
+		"module": "es2020", // モジュールの方式
+		"target": "es2020", // 出力する ECMAScript のバージョン
+		"moduleResolution": "node", // モジュール解決の方式
+		"noImplicitAny": true, // 暗黙的な any をエラーにする
+		"lib": ["es2020", "dom"], // コンパイルに含めるライブラリの指定
+		"newLine": "LF", // 生成コードの改行コードを指定する
+		"ignoreDeprecations": "5.0",
+		"outDir": "../tmp/types/" // 出力先ディレクトリ
+	},
+	"include": ["../src/**/*.js"], // コンパイル対象のファイル
+	"exclude": ["../src/**/*.test.js", "../src/**/__tests__/**"]
+}
