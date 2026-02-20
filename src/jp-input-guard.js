@@ -288,6 +288,11 @@ class InputGuard {
 		this.onBlur = this.onBlur.bind(this);
 
 		/**
+		 * キャレット/選択範囲の変化イベントハンドラ（this固定）
+		 */
+		this.onSelectionChange = this.onSelectionChange.bind(this);
+
+		/**
 		 * swap時に退避しておく元要素情報
 		 * detach時に復元するために使用
 		 * @type {SwapState|null}
@@ -553,6 +558,12 @@ class InputGuard {
 		this.displayElement.addEventListener("compositionend", this.onCompositionEnd);
 		this.displayElement.addEventListener("input", this.onInput);
 		this.displayElement.addEventListener("blur", this.onBlur);
+
+		// キャレット/選択範囲の変化を拾う（block時の不自然ジャンプ対策）
+		this.displayElement.addEventListener("keyup", this.onSelectionChange);
+		this.displayElement.addEventListener("mouseup", this.onSelectionChange);
+		this.displayElement.addEventListener("select", this.onSelectionChange);
+		this.displayElement.addEventListener("focus", this.onSelectionChange);
 	}
 
 	/**
@@ -564,6 +575,10 @@ class InputGuard {
 		this.displayElement.removeEventListener("compositionend", this.onCompositionEnd);
 		this.displayElement.removeEventListener("input", this.onInput);
 		this.displayElement.removeEventListener("blur", this.onBlur);
+		this.displayElement.removeEventListener("keyup", this.onSelectionChange);
+		this.displayElement.removeEventListener("mouseup", this.onSelectionChange);
+		this.displayElement.removeEventListener("select", this.onSelectionChange);
+		this.displayElement.removeEventListener("focus", this.onSelectionChange);
 	}
 
 	/**
@@ -776,6 +791,20 @@ class InputGuard {
 	 */
 	onBlur() {
 		this.evaluateCommit();
+	}
+
+	/**
+	 * キャレット/選択範囲の変化を lastAcceptedSelection に反映する
+	 * - 値が変わっていない状態でもキャレットは動くため、block時に自然な位置へ戻すために使う
+	 * @returns {void}
+	 */
+	onSelectionChange() {
+		// IME変換中は無視（この間はキャレット位置が不安定になることがあるため）
+		if (this.composing) {
+			return;
+		}
+		const el = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		this.lastAcceptedSelection = this.readSelection(el);
 	}
 
 	/**
