@@ -14,20 +14,24 @@
 export { attach } from "./jp-input-guard.js";
 
 // rules (individual exports)
+export { digits } from "./rules/digits.js";
 export { numeric } from "./rules/numeric.js";
 
 // rules namespace export
+import { digits } from "./rules/digits.js";
 import { numeric } from "./rules/numeric.js";
 
 /**
  * ルール生成関数の名前空間（rules.xxx(...) で使う）
  */
 export const rules = {
-	numeric
+	numeric,
+	digits
 };
 
 /**
  * バージョン（ビルド時に置換したいならここを差し替える）
  * 例: rollup replace で "__VERSION__" を package.json の version に置換
  */
-export const version = process.env.VERSION;
+// @ts-ignore
+export const version = typeof __VERSION__ !== "undefined" ? __VERSION__ : "dev";

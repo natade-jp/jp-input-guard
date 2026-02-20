@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>JP Input Guard - numeric dev</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  padding: 40px;
+}
+
+input {
+  font-size: 18px;
+  padding: 6px 8px;
+  width: 200px;
+}
+
+.is-invalid {
+  border: 2px solid red;
+  background: #fff4f4;
+}
+
+pre {
+  background: #f5f5f5;
+  padding: 12px;
+  margin-top: 20px;
+}
+</style>
+</head>
+<body>
+
+<h1>numeric rule dev test</h1>
+
+<label>
+	数値入力:
+	<input id="price" type="text" inputmode="decimal">
+</label>
+
+<div style="margin-top:20px;">
+	<button id="check">isValid()</button>
+</div>
+
+<pre id="output"></pre>
+
+<script type="module">
+import { attach, rules } from "../../src/main.js";
+
+const input = document.getElementById("price");
+const output = document.getElementById("output");
+
+const guard = attach(input, {
+	rules: [
+		rules.numeric({
+			allowFullWidth: true,
+			allowMinus: true,
+			allowDecimal: true
+		}),
+		rules.digits({
+		int: 6,
+		frac: 2,
+		fixIntOnBlur: "truncateLeft",
+		fixFracOnBlur: "truncate"
+		})
+	]
+});
+
+function renderState() {
+	output.textContent =
+`display value : ${input.value}
+raw value     : ${guard.getRawValue()}
+isValid       : ${guard.isValid()}
+errors        : ${JSON.stringify(guard.getErrors(), null, 2)}`;
+}
+
+input.addEventListener("compositionend", renderState);
+input.addEventListener("input", renderState);
+input.addEventListener("blur", renderState);
+
+document.getElementById("check").addEventListener("click", renderState);
+
+renderState();
+</script>
+
+</body>
+</html>

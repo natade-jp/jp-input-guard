@@ -130,4 +130,4 @@ batch();
 NTFile.exec('npx esdoc -c "./scripts/.esdoc.json"');
 
 // esdoc
-NTFile.copy("./dist/umd/mojix.min.js", "./docs/examples/libs/mojix.min.js");
+NTFile.copy("./dist/umd/jp-input-guard.min.js", "./docs/dist/libs/jp-input-guard.min.js");

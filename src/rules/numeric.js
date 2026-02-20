@@ -34,6 +34,7 @@ export function numeric(options = {}) {
 
 	/** @type {Set<string>} */
 	const minusLike = new Set([
+		"ー", // KATAKANA-HIRAGANA PROLONGED SOUND MARK
 		"－", // FULLWIDTH HYPHEN-MINUS
 		"−", // MINUS SIGN
 		"‐", // HYPHEN

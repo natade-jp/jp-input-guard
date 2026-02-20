@@ -277,6 +277,12 @@ class InputGuard {
 		 * @type {SwapState|null}
 		 */
 		this.swapState = null;
+
+		/**
+		 * IME変換後のinputイベントが来ない環境向けのフラグ
+		 * @type {boolean}
+		 */
+		this.pendingCompositionCommit = false;
 	}
 
 	/**
@@ -630,12 +636,22 @@ class InputGuard {
 
 	/**
 	 * IME変換終了：composition中フラグを下ろす
-	 * - 直後に input イベントが飛ぶので、ここでは評価しない
+	 * - 環境によって input が飛ばない/遅れるので、ここでフォールバック評価を入れる
 	 * @returns {void}
 	 */
 	onCompositionEnd() {
 		this.composing = false;
-		// compositionend後にinputイベントが飛ぶので、ここでは触らない
+
+		// compositionend後に input が来ない環境向けのフォールバック
+		this.pendingCompositionCommit = true;
+
+		queueMicrotask(() => {
+			// その後 input で処理済みなら何もしない
+			if (!this.pendingCompositionCommit) return;
+
+			this.pendingCompositionCommit = false;
+			this.evaluateInput();
+		});
 	}
 
 	/**
@@ -643,6 +659,8 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onInput() {
+		// compositionend後に input が来た場合、フォールバックを無効化
+		this.pendingCompositionCommit = false;
 		this.evaluateInput();
 	}
 
@@ -652,6 +670,42 @@ class InputGuard {
 	 */
 	onBlur() {
 		this.evaluateCommit();
+	}
+
+	/**
+	 * display.value を更新しつつ、可能ならカーソル位置を保つ（入力中用）
+	 * - 文字が削除される/増える可能性があるので、左側だけ正規化した長さで補正する
+	 * @param {HTMLInputElement|HTMLTextAreaElement} el
+	 * @param {string} nextValue
+	 * @returns {void}
+	 */
+	setDisplayValuePreserveCaret(el, nextValue) {
+		const prevValue = el.value;
+		if (prevValue === nextValue) return;
+
+		const start = el.selectionStart;
+		const end = el.selectionEnd;
+
+		// selectionが取れないなら単純代入
+		if (start == null || end == null) {
+			el.value = nextValue;
+			return;
+		}
+
+		// 左側の文字列を「同じ正規化」で処理して、新しいカーソル位置を推定
+		const leftPrev = prevValue.slice(0, start);
+		let leftNext = leftPrev;
+		leftNext = this.runNormalizeChar(leftNext);
+		leftNext = this.runNormalizeStructure(leftNext);
+
+		el.value = nextValue;
+
+		const newPos = Math.min(leftNext.length, nextValue.length);
+		try {
+			el.setSelectionRange(newPos, newPos);
+		} catch (_e) {
+			// type=hidden/number などでは例外の可能性があるが、ここはtext想定
+		}
 	}
 
 	/**
@@ -675,9 +729,9 @@ class InputGuard {
 		v = this.runNormalizeChar(v);
 		v = this.runNormalizeStructure(v);
 
-		// normalizeで変わったら反映（selection補正は後で）
+		// normalizeで変わったら反映（selection補正）
 		if (v !== current) {
-			this.syncDisplay(v);
+			this.setDisplayValuePreserveCaret(display, v);
 		}
 
 		// validate（入力中：エラー出すだけ）
