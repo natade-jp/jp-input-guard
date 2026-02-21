@@ -922,40 +922,42 @@ class InputGuard {
 		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
 		const current = display.value;
 
-		// ctx を作る（ requestRevert が使える）
 		const ctx = this.createCtx();
 
-		let v = current;
-		// 固定順
-		v = this.runNormalizeChar(v, ctx);
-		v = this.runNormalizeStructure(v, ctx);
+		// raw候補（入力中は表示値＝rawとして扱う）
+		let raw = current;
+
+		raw = this.runNormalizeChar(raw, ctx);
+		raw = this.runNormalizeStructure(raw, ctx);
 
 		// normalizeで変わったら反映（selection補正）
-		if (v !== current) {
-			this.setDisplayValuePreserveCaret(display, v, ctx);
+		if (raw !== current) {
+			this.setDisplayValuePreserveCaret(display, raw, ctx);
 		}
 
 		// validate（入力中：エラー出すだけ）
-		this.runValidate(v, ctx);
+		this.runValidate(raw, ctx);
 
-		// revert 要求が出たら巻き戻して終了
+		// revert要求が出たら巻き戻して終了
 		if (this.revertRequest) {
 			this.revertDisplay(this.revertRequest);
 			return;
 		}
 
-		// rawは常に最新に
-		this.syncRaw(v);
+		// rawは常に最新に（swapでも非swapでもOK）
+		this.syncRaw(raw);
+
 		this.applyInvalidClass();
 
-		// ここまで来たら「受理」扱いとして保存
-		this.lastAcceptedValue = v;
+		// 受理値は常にrawとして保存（revert先・getRawValueの一貫性）
+		this.lastAcceptedValue = raw;
 		this.lastAcceptedSelection = this.readSelection(display);
 	}
 
 	/**
 	 * 確定時（blur）の評価（IME中は何もしない）
 	 * - 固定順：normalize.char → normalize.structure → validate → fix → format
+	 * - raw は format 前、display は format 後
 	 * @returns {void}
 	 */
 	evaluateCommit() {
@@ -967,38 +969,50 @@ class InputGuard {
 		this.revertRequest = null;
 
 		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
-		let v = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement).value;
-
 		const ctx = this.createCtx();
 
-		v = this.runNormalizeChar(v, ctx);
-		v = this.runNormalizeStructure(v, ctx);
+		// 1) raw候補（displayから取得）
+		let raw = display.value;
 
-		// 入力内容の検査
-		this.runValidate(v, ctx);
+		// 2) 正規化（rawとして扱う形に揃える）
+		raw = this.runNormalizeChar(raw, ctx);
+		raw = this.runNormalizeStructure(raw, ctx);
 
-		// block要求があれば戻す（将来用に枠だけ用意）
+		// 3) 入力内容の検査（fix前）
+		this.runValidate(raw, ctx);
+
+		// block要求があれば戻す（将来用）
 		if (this.revertRequest) {
 			this.revertDisplay(this.revertRequest);
 			return;
 		}
 
-		// commitのみ
-		v = this.runFix(v, ctx);
-		v = this.runFormat(v, ctx);
+		// 4) commitのみの補正（丸め・切り捨て・繰り上がりなど）
+		raw = this.runFix(raw, ctx);
 
-		// 最終値で検査し直す（fixで繰り上がる等に対応）
+		// 5) 最終rawで検査し直す（fixで値が変わった場合に対応）
 		this.clearErrors();
 		this.revertRequest = null;
-		this.runValidate(v, ctx);
+		this.runValidate(raw, ctx);
 
-		this.syncDisplay(v);
-		this.syncRaw(v);
+		if (this.revertRequest) {
+			this.revertDisplay(this.revertRequest);
+			return;
+		}
+
+		// 6) raw同期（format前を入れる）
+		this.syncRaw(raw);
+
+		// 7) 表示用は format 後（カンマ等）
+		let shown = raw;
+		shown = this.runFormat(shown, ctx);
+
+		this.syncDisplay(shown);
 
 		this.applyInvalidClass();
 
-		// commit後の値を受理値として保存（revert先を自然に）
-		this.lastAcceptedValue = v;
+		// 8) 受理値は raw を保持（revertやgetRawValueが安定する）
+		this.lastAcceptedValue = raw;
 		this.lastAcceptedSelection = this.readSelection(display);
 	}
 
