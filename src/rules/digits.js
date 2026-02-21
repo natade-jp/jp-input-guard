@@ -1,4 +1,12 @@
-// @ts-check
+/**
+ * The script is part of JPInputGuard.
+ *
+ * AUTHOR:
+ *  natade-jp (https://github.com/natade-jp)
+ *
+ * LICENSE:
+ *  The MIT license https://opensource.org/licenses/MIT
+ */
 
 /**
  * digits ルールのオプション

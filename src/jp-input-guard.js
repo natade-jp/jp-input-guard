@@ -35,6 +35,7 @@
  * @property {() => boolean} isValid - 現在エラーが無いかどうか
  * @property {() => JpigError[]} getErrors - エラー一覧を取得
  * @property {() => string} getRawValue - 送信用の正規化済み値を取得
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay側）
  */
 
 /**
@@ -66,12 +67,21 @@
  */
 
 /**
+ * 表示値(display)と内部値(raw)の分離設定
+ * @typedef {Object} SeparateValueOptions
+ * @property {"auto"|"swap"|"off"} [mode="auto"]
+ *   - "auto": format系ルールがある場合のみ自動でswapする（既定）
+ *   - "swap": 常にswapする（inputのみ対応）
+ *   - "off": 分離しない（displayとrawを同一に扱う）
+ */
+
+/**
  * attach() に渡す設定オプション
  * @typedef {Object} AttachOptions
  * @property {Rule[]} [rules] - 適用するルール配列（順番がフェーズ内実行順になる）
  * @property {boolean} [warn] - 非対応ルールなどを console.warn するか
  * @property {string} [invalidClass] - エラー時に付けるclass名
- * @property {{ mode?: "swap"|"off" }} [separateValue] - 表示/内部値分離設定（v0.1はinputのswapのみ対応）
+ * @property {SeparateValueOptions} [separateValue] - 表示値と内部値の分離設定
  */
 
 /**
@@ -288,6 +298,11 @@ class InputGuard {
 		this.onBlur = this.onBlur.bind(this);
 
 		/**
+		 * focusイベントハンドラ（this固定）
+		 */
+		this.onFocus = this.onFocus.bind(this);
+
+		/**
 		 * キャレット/選択範囲の変化イベントハンドラ（this固定）
 		 */
 		this.onSelectionChange = this.onSelectionChange.bind(this);
@@ -329,8 +344,9 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	init() {
-		this.applySeparateValue();
+		// 指定されたオプションを確認するためにも先に実施
 		this.buildPipeline();
+		this.applySeparateValue();
 		this.bindEvents();
 		// 初期値を評価
 		this.evaluateInput();
@@ -375,7 +391,14 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	applySeparateValue() {
-		const mode = this.options.separateValue?.mode ?? "off";
+		const userMode = this.options.separateValue?.mode ?? "auto";
+
+		// autoの場合：format系ルールがあるときだけswap
+		const mode =
+		userMode === "auto"
+			? (this.formatRules.length > 0 ? "swap" : "off")
+			: userMode;
+
 		if (mode !== "swap") {
 			return;
 		}
@@ -559,6 +582,9 @@ class InputGuard {
 		this.displayElement.addEventListener("input", this.onInput);
 		this.displayElement.addEventListener("blur", this.onBlur);
 
+		// フォーカスで編集用に戻す
+		this.displayElement.addEventListener("focus", this.onFocus);
+
 		// キャレット/選択範囲の変化を拾う（block時の不自然ジャンプ対策）
 		this.displayElement.addEventListener("keyup", this.onSelectionChange);
 		this.displayElement.addEventListener("mouseup", this.onSelectionChange);
@@ -575,6 +601,7 @@ class InputGuard {
 		this.displayElement.removeEventListener("compositionend", this.onCompositionEnd);
 		this.displayElement.removeEventListener("input", this.onInput);
 		this.displayElement.removeEventListener("blur", this.onBlur);
+		this.displayElement.removeEventListener("focus", this.onFocus);
 		this.displayElement.removeEventListener("keyup", this.onSelectionChange);
 		this.displayElement.removeEventListener("mouseup", this.onSelectionChange);
 		this.displayElement.removeEventListener("select", this.onSelectionChange);
@@ -752,6 +779,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onCompositionStart() {
+		console.log("[jp-input-guard] compositionstart");
 		this.composing = true;
 	}
 
@@ -761,6 +789,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onCompositionEnd() {
+		console.log("[jp-input-guard] compositionend");
 		this.composing = false;
 
 		// compositionend後に input が来ない環境向けのフォールバック
@@ -780,6 +809,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onInput() {
+		console.log("[jp-input-guard] input");
 		// compositionend後に input が来た場合、フォールバックを無効化
 		this.pendingCompositionCommit = false;
 		this.evaluateInput();
@@ -790,7 +820,38 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onBlur() {
+		console.log("[jp-input-guard] blur");
 		this.evaluateCommit();
+	}
+
+	/**
+	 * focusイベント：表示整形（カンマ等）を剥がして編集しやすい状態にする
+	 * - validate は走らせない（触っただけで赤くしたくないため）
+	 * @returns {void}
+	 */
+	onFocus() {
+		if (this.composing) { return; }
+
+		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		const current = display.value;
+
+		const ctx = this.createCtx();
+
+		let v = current;
+		v = this.runNormalizeChar(v, ctx);       // カンマ除去が効く
+		v = this.runNormalizeStructure(v, ctx);
+
+		if (v !== current) {
+			this.setDisplayValuePreserveCaret(display, v, ctx);
+			this.syncRaw(v);
+		}
+
+		// 受理値更新（blockで戻す位置も自然になる）
+		this.lastAcceptedValue = v;
+		this.lastAcceptedSelection = this.readSelection(display);
+
+		// キャレット/選択範囲の変化も反映しておく（blockで戻す位置も自然になる）
+		this.onSelectionChange();
 	}
 
 	/**
@@ -978,7 +1039,8 @@ class InputGuard {
 			detach: () => this.detach(),
 			isValid: () => this.isValid(),
 			getErrors: () => this.getErrors(),
-			getRawValue: () => this.getRawValue()
+			getRawValue: () => this.getRawValue(),
+			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement)
 		};
 	}
 }

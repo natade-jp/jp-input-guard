@@ -60,20 +60,22 @@
 						//			overflowInputInt: "none"    // 整数は赤くなるだけ
 						overflowInputInt: "block",
 						overflowInputFrac: "block"
-					})
+					}),
+					rules.comma()
 				]
 			});
+			const el = guard.getDisplayElement();
 
 			function renderState() {
-				output.textContent = `display value : ${input.value}
+				output.textContent = `display value : ${el.value}
 raw value     : ${guard.getRawValue()}
 isValid       : ${guard.isValid()}
 errors        : ${JSON.stringify(guard.getErrors(), null, 2)}`;
 			}
 
-			input.addEventListener("compositionend", renderState);
-			input.addEventListener("input", renderState);
-			input.addEventListener("blur", renderState);
+			el.addEventListener("compositionend", renderState);
+			el.addEventListener("input", renderState);
+			el.addEventListener("blur", renderState);
 
 			document.getElementById("check").addEventListener("click", renderState);
 

@@ -16,17 +16,20 @@ export { attach } from "./jp-input-guard.js";
 // rules (individual exports)
 export { digits } from "./rules/digits.js";
 export { numeric } from "./rules/numeric.js";
+export { comma } from "./rules/formatComma.js";
 
 // rules namespace export
 import { digits } from "./rules/digits.js";
 import { numeric } from "./rules/numeric.js";
+import { comma } from "./rules/formatComma.js";
 
 /**
  * ルール生成関数の名前空間（rules.xxx(...) で使う）
  */
 export const rules = {
 	numeric,
-	digits
+	digits,
+	comma
 };
 
 /**

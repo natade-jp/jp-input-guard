@@ -122,8 +122,13 @@ export function numeric(options = {}) {
 		 * @returns {string}
 		 */
 		normalizeChar(value) {
+			let v = String(value);
+
+			// 表示専用装飾の除去（format対策）
+			v = v.replace(/,/g, "");
+
 			let out = "";
-			for (const ch of String(value)) {
+			for (const ch of v) {
 				out += normalizeChar1(ch);
 			}
 			return out;
