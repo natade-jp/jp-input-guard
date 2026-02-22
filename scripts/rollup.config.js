@@ -84,19 +84,19 @@ const createData = function ({ banner, globalName, input, outputFile, format, is
 };
 
 const banner = `/*!
- * JP Input Guard
+ * TextInputGuard
  * AUTHOR: natade (https://github.com/natade-jp/)
  * LICENSE: MIT https://opensource.org/licenses/MIT
  */`;
 
-const packageName = "jp-input-guard";
-const globalName = "JPInputGuard";
+const packageName = "text-input-guard";
+const globalName = "TextInputGuard";
 const input = "./src/main.js";
 
 /** @type {import("rollup").RollupOptions[]} */
 const data = [];
 
-// UMD（グローバルは JPInputGuard, ファイル名は jp-input-guard.js）
+// UMD（グローバルは TextInputGuard, ファイル名は text-input-guard.js）
 data.push(
 	createData({
 		banner,

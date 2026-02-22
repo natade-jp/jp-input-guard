@@ -1,7 +1,7 @@
 /**
- * JP Input Guard - Public Entry
+ * TextInputGuard - Public Entry
  * - ESM/CJS: named exports (attach / autoAttach / rules / numeric / digits / comma / version)
- * - UMD: exposed to global (e.g. window.JPInputGuard) with the same shape
+ * - UMD: exposed to global (e.g. window.TextInputGuard) with the same shape
  *
  * AUTHOR:
  *  natade-jp (https://github.com/natade-jp)
@@ -10,7 +10,7 @@
  *  The MIT license https://opensource.org/licenses/MIT
  */
 
-import { attach, attachAll } from "./jp-input-guard.js";
+import { attach, attachAll } from "./text-input-guard.js";
 import { InputGuardAutoAttach } from "./auto-attach.js";
 
 // rules

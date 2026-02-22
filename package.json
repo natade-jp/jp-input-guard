@@ -1,5 +1,5 @@
 {
-	"name": "jp-input-guard",
+	"name": "text-input-guard",
 	"version": "0.0.1",
 	"description": "test",
 	"keywords": [
@@ -8,29 +8,29 @@
 	"author": "natade-jp <natade3@gmail.com> (https://github.com/natade-jp)",
 	"license": "MIT",
 	"type": "module",
-	"source": "./src/jp-input-guard.js",
-	"main": "./dist/cjs/jp-input-guard.cjs",
-	"module": "./dist/esm/jp-input-guard.js",
-	"types": "./dist/types/jp-input-guard.d.ts",
+	"source": "./src/text-input-guard.js",
+	"main": "./dist/cjs/text-input-guard.cjs",
+	"module": "./dist/esm/text-input-guard.js",
+	"types": "./dist/types/text-input-guard.d.ts",
 	"exports": {
 		".": {
-			"types": "./dist/types/jp-input-guard.d.ts",
-			"import": "./dist/esm/jp-input-guard.js",
-			"require": "./dist/cjs/jp-input-guard.cjs",
-			"browser": "./dist/umd/jp-input-guard.js",
-			"default": "./dist/esm/jp-input-guard.js"
+			"types": "./dist/types/text-input-guard.d.ts",
+			"import": "./dist/esm/text-input-guard.js",
+			"require": "./dist/cjs/text-input-guard.cjs",
+			"browser": "./dist/umd/text-input-guard.js",
+			"default": "./dist/esm/text-input-guard.js"
 		}
 	},
-	"unpkg": "./dist/umd/jp-input-guard.min.js",
-	"jsdelivr": "./dist/umd/jp-input-guard.min.js",
+	"unpkg": "./dist/umd/text-input-guard.min.js",
+	"jsdelivr": "./dist/umd/text-input-guard.min.js",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/natade-jp/jp-input-guard.git"
+		"url": "git+https://github.com/natade-jp/text-input-guard.git"
 	},
 	"bugs": {
-		"url": "https://github.com/natade-jp/jp-input-guard/issues"
+		"url": "https://github.com/natade-jp/text-input-guard/issues"
 	},
-	"homepage": "https://github.com/natade-jp/jp-input-guard",
+	"homepage": "https://github.com/natade-jp/text-input-guard",
 	"files": [
 		"dist/"
 	],

@@ -1,5 +1,5 @@
 /**
- * The script is part of JPInputGuard.
+ * The script is part of TextInputGuard.
  *
  * AUTHOR:
  *  natade-jp (https://github.com/natade-jp)
@@ -25,7 +25,7 @@ import { parseDatasetBool } from "./_dataset.js";
  * - fix: 確定時（blur）に「-」「.」「-.」や末尾の「.」を空/削除にする
  *
  * @param {NumericRuleOptions} [options]
- * @returns {import("../jp-input-guard.js").Rule}
+ * @returns {import("../text-input-guard.js").Rule}
  */
 export function numeric(options = {}) {
 	const opt = {
@@ -255,22 +255,22 @@ export function numeric(options = {}) {
 
 /**
  * datasetから numeric ルールを生成する
- * - data-jpig-rules-numeric が無ければ null
- * - オプションは data-jpig-rules-numeric-xxx から読む
+ * - data-tig-rules-numeric が無ければ null
+ * - オプションは data-tig-rules-numeric-xxx から読む
  *
  * 対応する data 属性（dataset 名）
- * - data-jpig-rules-numeric                       -> dataset.jpigRulesNumeric
- * - data-jpig-rules-numeric-allow-full-width      -> dataset.jpigRulesNumericAllowFullWidth
- * - data-jpig-rules-numeric-allow-minus           -> dataset.jpigRulesNumericAllowMinus
- * - data-jpig-rules-numeric-allow-decimal         -> dataset.jpigRulesNumericAllowDecimal
+ * - data-tig-rules-numeric                       -> dataset.tigRulesNumeric
+ * - data-tig-rules-numeric-allow-full-width      -> dataset.tigRulesNumericAllowFullWidth
+ * - data-tig-rules-numeric-allow-minus           -> dataset.tigRulesNumericAllowMinus
+ * - data-tig-rules-numeric-allow-decimal         -> dataset.tigRulesNumericAllowDecimal
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
- * @returns {import("../jp-input-guard.js").Rule|null}
+ * @returns {import("../text-input-guard.js").Rule|null}
  */
 numeric.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-jpig-rules-numeric が無ければ対象外
-	if (dataset.jpigRulesNumeric == null) {
+	// ON判定：data-tig-rules-numeric が無ければ対象外
+	if (dataset.tigRulesNumeric == null) {
 		return null;
 	}
 
@@ -278,19 +278,19 @@ numeric.fromDataset = function fromDataset(dataset, _el) {
 	const options = {};
 
 	// allowFullWidth（未指定なら numeric側デフォルト true）
-	const allowFullWidth = parseDatasetBool(dataset.jpigRulesNumericAllowFullWidth);
+	const allowFullWidth = parseDatasetBool(dataset.tigRulesNumericAllowFullWidth);
 	if (allowFullWidth != null) {
 		options.allowFullWidth = allowFullWidth;
 	}
 
 	// allowMinus（未指定なら numeric側デフォルト false）
-	const allowMinus = parseDatasetBool(dataset.jpigRulesNumericAllowMinus);
+	const allowMinus = parseDatasetBool(dataset.tigRulesNumericAllowMinus);
 	if (allowMinus != null) {
 		options.allowMinus = allowMinus;
 	}
 
 	// allowDecimal（未指定なら numeric側デフォルト false）
-	const allowDecimal = parseDatasetBool(dataset.jpigRulesNumericAllowDecimal);
+	const allowDecimal = parseDatasetBool(dataset.tigRulesNumericAllowDecimal);
 	if (allowDecimal != null) {
 		options.allowDecimal = allowDecimal;
 	}

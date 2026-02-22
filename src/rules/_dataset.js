@@ -1,4 +1,14 @@
 /**
+ * The script is part of TextInputGuard.
+ *
+ * AUTHOR:
+ *  natade-jp (https://github.com/natade-jp)
+ *
+ * LICENSE:
+ *  The MIT license https://opensource.org/licenses/MIT
+ */
+
+/**
  * datasetのboolean値を解釈する
  * - 未指定なら undefined
  * - "" / "true" / "1" / "yes" / "on" は true

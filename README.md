@@ -1,19 +1,19 @@
-# JP Input Guard
+# TextInputGuard
 
-JP Input Guard は、日本向けの入力欄ガードライブラリです。
+TextInputGuard は、**開発中**の日本向けの入力欄ガードライブラリです。
 
 `<input>` / `<textarea>` に対して、数値入力や日本語特有の制約（全角混在、桁数、表示整形など）を扱いやすい形で提供します。
 
-主な考え方は次の通りです。
+利用方法は次の通りです。
 
-- コアは `attach()`：1要素ずつ明示的に有効化する（どの環境でも安定）
-- 複数要素は `attachAll()`：まとめて有効化し、まとめて `detach()` できる
-- `autoAttach()`：`data-jpig-*` の指定から自動で `attach()` する（HTMLだけで雑に使える）
+- `attach()`：1要素ずつ明示的に有効化する
+- `attachAll()`：まとめて有効化し、まとめて `detach()` する
+- `autoAttach()`：`data-tig-*` の指定から自動で `attach()` する
 
 ## インストール
 
 ```bash
-npm i jp-input-guard
+npm i text-input-guard
 ```
 
 ## 使い方
@@ -23,7 +23,7 @@ npm i jp-input-guard
 最も基本の使い方です。1つの要素に対してガードを適用します。
 
 ```js
-import { attach, rules } from "jp-input-guard";
+import { attach, rules } from "text-input-guard";
 
 const input = document.querySelector("#price");
 
@@ -57,9 +57,9 @@ const guard = attach(input, {
 通常は入力欄が複数あるため、`querySelectorAll()` の戻り値に対してまとめて適用できます。
 
 ```js
-import { attachAll, rules } from "jp-input-guard";
+import { attachAll, rules } from "text-input-guard";
 
-const group = attachAll(document.querySelectorAll(".jpig-price"), {
+const group = attachAll(document.querySelectorAll(".tig-price"), {
 	rules: [
 		rules.numeric({ allowFullWidth: true, allowMinus: true, allowDecimal: true }),
 		rules.digits({ int: 6, frac: 2 }),
@@ -89,28 +89,28 @@ const group = attachAll(document.querySelectorAll(".jpig-price"), {
 
 ### 3) autoAttach（data属性から自動で適用）
 
-HTML側に `data-jpig-*` を書いておき、JS側では `autoAttach()` を呼ぶだけで適用できます。
+HTML側に `data-tig-*` を書いておき、JS側では `autoAttach()` を呼ぶだけで適用できます。
 
 ```html
 <input
 	class="price"
 	name="price"
-	data-jpig-rules-numeric
-	data-jpig-rules-numeric-allow-full-width="true"
-	data-jpig-rules-numeric-allow-minus="true"
-	data-jpig-rules-numeric-allow-decimal="true"
-	data-jpig-rules-digits
-	data-jpig-rules-digits-int="6"
-	data-jpig-rules-digits-frac="2"
-	data-jpig-rules-digits-overflow-input-int="block"
-	data-jpig-rules-digits-overflow-input-frac="block"
-	data-jpig-rules-digits-fix-frac-on-blur="round"
-	data-jpig-rules-comma
+	data-tig-rules-numeric
+	data-tig-rules-numeric-allow-full-width="true"
+	data-tig-rules-numeric-allow-minus="true"
+	data-tig-rules-numeric-allow-decimal="true"
+	data-tig-rules-digits
+	data-tig-rules-digits-int="6"
+	data-tig-rules-digits-frac="2"
+	data-tig-rules-digits-overflow-input-int="block"
+	data-tig-rules-digits-overflow-input-frac="block"
+	data-tig-rules-digits-fix-frac-on-blur="round"
+	data-tig-rules-comma
 />
 ```
 
 ```js
-import { autoAttach } from "jp-input-guard";
+import { autoAttach } from "text-input-guard";
 
 // document 全体を対象に自動適用
 const guards = autoAttach();
@@ -121,8 +121,8 @@ const guards = autoAttach();
 
 `autoAttach()` は attachした `GuardGroup` を返します。
 
-- 既に `data-jpig-attached` が付いている要素はスキップします
-- `data-jpig-rules-*` を読み取って `rules` に変換します
+- 既に `data-tig-attached` が付いている要素はスキップします
+- `data-tig-rules-*` を読み取って `rules` に変換します
 
 ## ルール
 

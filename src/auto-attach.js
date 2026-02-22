@@ -1,5 +1,5 @@
 ﻿/**
- * The script is part of JPInputGuard.
+ * The script is part of TextInputGuard.
  *
  * AUTHOR:
  *  natade-jp (https://github.com/natade-jp)
@@ -9,10 +9,10 @@
  */
 
 /**
- * @typedef {import("./jp-input-guard.js").GuardGroup} GuardGroup
- * @typedef {import("./jp-input-guard.js").Guard} Guard
- * @typedef {import("./jp-input-guard.js").AttachOptions} AttachOptions
- * @typedef {import("./jp-input-guard.js").Rule} Rule
+ * @typedef {import("./text-input-guard.js").GuardGroup} GuardGroup
+ * @typedef {import("./text-input-guard.js").Guard} Guard
+ * @typedef {import("./text-input-guard.js").AttachOptions} AttachOptions
+ * @typedef {import("./text-input-guard.js").Rule} Rule
  */
 
 /**
@@ -49,21 +49,21 @@ function parseSeparateMode(v) {
 
 /**
  * その要素が autoAttach の対象かを判定する
- * - 設定系（data-jpig-separate / warn / invalid-class）
- * - ルール系（data-jpig-rules-* が1つでもある）
+ * - 設定系（data-tig-separate / warn / invalid-class）
+ * - ルール系（data-tig-rules-* が1つでもある）
  * @param {DOMStringMap} ds
  * @returns {boolean}
  */
 function hasAnyJpigConfig(ds) {
 	// attach設定系
-	if (ds.jpigSeparate != null) { return true; }
-	if (ds.jpigWarn != null) { return true; }
-	if (ds.jpigInvalidClass != null) { return true; }
+	if (ds.tigSeparate != null) { return true; }
+	if (ds.tigWarn != null) { return true; }
+	if (ds.tigInvalidClass != null) { return true; }
 
-	// ルール系（data-jpig-rules-*）
+	// ルール系（data-tig-rules-*）
 	for (const k in ds) {
-		// data-jpig-rules-numeric -> ds.jpigRulesNumeric
-		if (k.startsWith("jpigRules")) {
+		// data-tig-rules-numeric -> ds.tigRulesNumeric
+		if (k.startsWith("tigRules")) {
 			return true;
 		}
 	}
@@ -97,8 +97,8 @@ export class InputGuardAutoAttach {
 
 	/**
 	 * root 配下の input/textarea を data属性から自動で attach する
-	 * - 既に `data-jpig-attached` が付いているものはスキップ
-	 * - `data-jpig-*`（設定）と `data-jpig-rules-*`（ルール）を拾って options を生成
+	 * - 既に `data-tig-attached` が付いているものはスキップ
+	 * - `data-tig-*`（設定）と `data-tig-rules-*`（ルール）を拾って options を生成
 	 *
 	 * @param {Document|DocumentFragment|ShadowRoot|Element} [root=document]
 	 * @returns {GuardGroup}
@@ -129,7 +129,7 @@ export class InputGuardAutoAttach {
 			const ds = el.dataset;
 
 			// 二重attach防止
-			if (ds.jpigAttached === "true") { continue; }
+			if (ds.tigAttached === "true") { continue; }
 
 			// JPIGの設定が何も無ければ対象外
 			if (!hasAnyJpigConfig(ds)) { continue; }
@@ -138,15 +138,15 @@ export class InputGuardAutoAttach {
 			const options = {};
 
 			// warn / invalidClass
-			const warn = parseBool(ds.jpigWarn);
+			const warn = parseBool(ds.tigWarn);
 			if (warn != null) { options.warn = warn; }
 
-			if (ds.jpigInvalidClass != null && String(ds.jpigInvalidClass).trim() !== "") {
-				options.invalidClass = String(ds.jpigInvalidClass);
+			if (ds.tigInvalidClass != null && String(ds.tigInvalidClass).trim() !== "") {
+				options.invalidClass = String(ds.tigInvalidClass);
 			}
 
 			// separateValue（未指定は auto）
-			options.separateValue = { mode: parseSeparateMode(ds.jpigSeparate) };
+			options.separateValue = { mode: parseSeparateMode(ds.tigSeparate) };
 
 			// ルール収集
 			/** @type {Rule[]} */
@@ -158,7 +158,7 @@ export class InputGuardAutoAttach {
 				} catch (e) {
 					const w = options.warn ?? true;
 					if (w) {
-						console.warn(`[jp-input-guard] autoAttach: rule "${fac.name}" fromDataset() threw an error.`, e);
+						console.warn(`[text-input-guard] autoAttach: rule "${fac.name}" fromDataset() threw an error.`, e);
 					}
 				}
 			}
@@ -172,7 +172,7 @@ export class InputGuardAutoAttach {
 			guards.push(guard);
 
 			// 二重attach防止フラグ
-			el.dataset.jpigAttached = "true";
+			el.dataset.tigAttached = "true";
 		}
 
 		return {

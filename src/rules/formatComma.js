@@ -1,5 +1,5 @@
 /**
- * The script is part of JPInputGuard.
+ * The script is part of TextInputGuard.
  *
  * AUTHOR:
  *  natade-jp (https://github.com/natade-jp)
@@ -11,7 +11,7 @@
 /**
  * カンマ付与ルール
  * - blur時のみ整数部に3桁区切りカンマを付与する
- * @returns {import("../jp-input-guard.js").Rule}
+ * @returns {import("../text-input-guard.js").Rule}
  */
 export function comma() {
 	return {
@@ -53,18 +53,18 @@ export function comma() {
 }
 /**
  * datasetから comma ルールを生成する
- * - data-jpig-rules-comma が無ければ null
+ * - data-tig-rules-comma が無ければ null
  *
  * 対応する data 属性（dataset 名）
- * - data-jpig-rules-comma -> dataset.jpigRulesComma
+ * - data-tig-rules-comma -> dataset.tigRulesComma
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
- * @returns {import("../jp-input-guard.js").Rule|null}
+ * @returns {import("../text-input-guard.js").Rule|null}
  */
 comma.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-jpig-rules-comma が無ければ対象外
-	if (dataset.jpigRulesComma == null) {
+	// ON判定：data-tig-rules-comma が無ければ対象外
+	if (dataset.tigRulesComma == null) {
 		return null;
 	}
 	return comma();

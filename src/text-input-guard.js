@@ -1,4 +1,4 @@
-/**
+﻿/**
  * The script is part of JPInputGuard.
  *
  * AUTHOR:
@@ -21,7 +21,7 @@
 
 /**
  * バリデーションエラー情報を表すオブジェクト
- * @typedef {Object} JpigError
+ * @typedef {Object} TigError
  * @property {string} code - エラー識別子（例: "digits.int_overflow"）
  * @property {string} rule - エラーを発生させたルール名
  * @property {PhaseName} phase - 発生したフェーズ
@@ -33,8 +33,9 @@
  * @typedef {Object} Guard
  * @property {() => void} detach - ガード解除（イベント削除・swap復元）
  * @property {() => boolean} isValid - 現在エラーが無いかどうか
- * @property {() => JpigError[]} getErrors - エラー一覧を取得
+ * @property {() => TigError[]} getErrors - エラー一覧を取得
  * @property {() => string} getRawValue - 送信用の正規化済み値を取得
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay側）
  */
 
 /**
@@ -48,7 +49,8 @@
  * @property {boolean} warn - warnログを出すかどうか
  * @property {string} invalidClass - エラー時に付与するclass名
  * @property {boolean} composing - IME変換中かどうか
- * @property {(e: JpigError) => void} pushError - エラーを登録する関数
+ * @property {(e: TigError) => void} pushError - エラーを登録する関数
+ * @property {(req: RevertRequest) => void} requestRevert - 入力を直前の受理値へ巻き戻す要求
  */
 
 /**
@@ -65,12 +67,21 @@
  */
 
 /**
+ * 表示値(display)と内部値(raw)の分離設定
+ * @typedef {Object} SeparateValueOptions
+ * @property {"auto"|"swap"|"off"} [mode="auto"]
+ *   - "auto": format系ルールがある場合のみ自動でswapする（既定）
+ *   - "swap": 常にswapする（inputのみ対応）
+ *   - "off": 分離しない（displayとrawを同一に扱う）
+ */
+
+/**
  * attach() に渡す設定オプション
  * @typedef {Object} AttachOptions
  * @property {Rule[]} [rules] - 適用するルール配列（順番がフェーズ内実行順になる）
  * @property {boolean} [warn] - 非対応ルールなどを console.warn するか
  * @property {string} [invalidClass] - エラー時に付けるclass名
- * @property {{ mode?: "swap"|"off" }} [separateValue] - 表示/内部値分離設定（v0.1はinputのswapのみ対応）
+ * @property {SeparateValueOptions} [separateValue] - 表示値と内部値の分離設定
  */
 
 /**
@@ -82,6 +93,21 @@
  * @property {string|null} originalName - 元のname属性
  * @property {string} originalClass - 元のclass文字列
  * @property {HTMLInputElement} createdDisplay - 生成した表示用input
+ */
+
+/**
+ * selection（カーソル/選択範囲）の退避情報
+ * @typedef {Object} SelectionState
+ * @property {number|null} start - selectionStart
+ * @property {number|null} end - selectionEnd
+ * @property {"forward"|"backward"|"none"|null} direction - selectionDirection
+ */
+
+/**
+ * revert要求（入力を巻き戻す指示）
+ * @typedef {Object} RevertRequest
+ * @property {string} reason - ルール名や理由（例: "digits.int_overflow"）
+ * @property {any} [detail] - デバッグ用の詳細
  */
 
 const DEFAULT_INVALID_CLASS = "is-invalid";
@@ -118,10 +144,38 @@ function warnLog(msg, warn) {
  * @param {AttachOptions} [options]
  * @returns {Guard}
  */
-function attach(element, options = {}) {
+export function attach(element, options = {}) {
 	const guard = new InputGuard(element, options);
 	guard.init();
 	return guard.toGuard();
+}
+
+/**
+ * @typedef {Object} GuardGroup
+ * @property {() => void} detach - 全部 detach
+ * @property {() => boolean} isValid - 全部 valid なら true
+ * @property {() => TigError[]} getErrors - 全部のエラーを集約
+ * @property {() => Guard[]} getGuards - 個別Guard配列
+ */
+
+/**
+ * @param {Iterable<HTMLInputElement|HTMLTextAreaElement>} elements
+ * @param {AttachOptions} [options]
+ * @returns {GuardGroup}
+ */
+export function attachAll(elements, options = {}) {
+	/** @type {Guard[]} */
+	const guards = [];
+	for (const el of elements) {
+		guards.push(attach(el, options));
+	}
+
+	return {
+		detach: () => { for (const g of guards) { g.detach(); } },
+		isValid: () => guards.every((g) => g.isValid()),
+		getErrors: () => guards.flatMap((g) => g.getErrors()),
+		getGuards: () => guards
+	};
 }
 
 class InputGuard {
@@ -146,7 +200,7 @@ class InputGuard {
 
 		const kind = detectKind(element);
 		if (!kind) {
-			throw new TypeError("[jp-input-guard] attach() expects an <input> or <textarea> element.");
+			throw new TypeError("[text-input-guard] attach() expects an <input> or <textarea> element.");
 		}
 
 		/**
@@ -204,7 +258,7 @@ class InputGuard {
 		/**
 		 * 現在発生しているエラー一覧
 		 * evaluateごとにリセットされる
-		 * @type {JpigError[]}
+		 * @type {TigError[]}
 		 */
 		this.errors = [];
 
@@ -272,11 +326,45 @@ class InputGuard {
 		this.onBlur = this.onBlur.bind(this);
 
 		/**
+		 * focusイベントハンドラ（this固定）
+		 */
+		this.onFocus = this.onFocus.bind(this);
+
+		/**
+		 * キャレット/選択範囲の変化イベントハンドラ（this固定）
+		 */
+		this.onSelectionChange = this.onSelectionChange.bind(this);
+
+		/**
 		 * swap時に退避しておく元要素情報
 		 * detach時に復元するために使用
 		 * @type {SwapState|null}
 		 */
 		this.swapState = null;
+
+		/**
+		 * IME変換後のinputイベントが来ない環境向けのフラグ
+		 * @type {boolean}
+		 */
+		this.pendingCompositionCommit = false;
+
+		/**
+		 * 直前に受理した表示値（block時の戻し先）
+		 * @type {string}
+		 */
+		this.lastAcceptedValue = "";
+
+		/**
+		 *  直前に受理したselection（block時の戻し先）
+		 * @type {SelectionState}
+		 */
+		this.lastAcceptedSelection = { start: null, end: null, direction: null };
+
+		/**
+		 * ルールからのrevert要求
+		 * @type {RevertRequest|null}
+		 */
+		this.revertRequest = null;
 	}
 
 	/**
@@ -284,11 +372,45 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	init() {
-		this.applySeparateValue();
+		// 指定されたオプションを確認するためにも先に実施
 		this.buildPipeline();
+		this.applySeparateValue();
 		this.bindEvents();
 		// 初期値を評価
 		this.evaluateInput();
+	}
+
+	/**
+	 * display要素のselection情報を読む
+	 * @param {HTMLInputElement|HTMLTextAreaElement} el
+	 * @returns {SelectionState}
+	 */
+	readSelection(el) {
+		return {
+			start: el.selectionStart,
+			end: el.selectionEnd,
+			direction: el.selectionDirection
+		};
+	}
+
+	/**
+	 * display要素のselection情報を復元する
+	 * @param {HTMLInputElement|HTMLTextAreaElement} el
+	 * @param {SelectionState} sel
+	 * @returns {void}
+	 */
+	writeSelection(el, sel) {
+		if (sel.start == null || sel.end == null) { return; }
+		try {
+			// direction は未対応環境があるので try で包む
+			if (sel.direction) {
+				el.setSelectionRange(sel.start, sel.end, sel.direction);
+			} else {
+				el.setSelectionRange(sel.start, sel.end);
+			}
+		} catch (_e) {
+			// type=hidden などでは例外になることがある（今回は display が text 想定）
+		}
 	}
 
 	/**
@@ -297,13 +419,20 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	applySeparateValue() {
-		const mode = this.options.separateValue?.mode ?? "off";
+		const userMode = this.options.separateValue?.mode ?? "auto";
+
+		// autoの場合：format系ルールがあるときだけswap
+		const mode =
+		userMode === "auto"
+			? (this.formatRules.length > 0 ? "swap" : "off")
+			: userMode;
+
 		if (mode !== "swap") {
 			return;
 		}
 
 		if (this.kind !== "input") {
-			warnLog('[jp-input-guard] separateValue.mode="swap" is not supported for <textarea>. ignored.', this.warn);
+			warnLog('[text-input-guard] separateValue.mode="swap" is not supported for <textarea>. ignored.', this.warn);
 			return;
 		}
 
@@ -323,12 +452,21 @@ class InputGuard {
 		// raw化（送信担当）
 		input.type = "hidden";
 		input.removeAttribute("id"); // displayに引き継ぐため
-		input.dataset.jpigRole = "raw";
+		input.dataset.tigRole = "raw";
+
+		// 元idのメタを残す（デバッグ/参照用）
+		if (this.swapState.originalId) {
+			input.dataset.tigOriginalId = this.swapState.originalId;
+		}
+
+		if (this.swapState.originalName) {
+			input.dataset.tigOriginalName = this.swapState.originalName;
+		}
 
 		// display生成（ユーザー入力担当）
 		const display = document.createElement("input");
 		display.type = "text";
-		display.dataset.jpigRole = "display";
+		display.dataset.tigRole = "display";
 
 		// id は display に移す
 		if (this.swapState.originalId) {
@@ -354,16 +492,17 @@ class InputGuard {
 		this.rawElement = input;
 
 		this.swapState.createdDisplay = display;
+
+		// revert 機構
+		this.lastAcceptedValue = display.value;
+		this.lastAcceptedSelection = this.readSelection(display);
 	}
 
 	/**
-	 * ガード解除（イベント解除＋swap復元）
+	 * swapしていた場合、元のinputへ復元する（detach用）
 	 * @returns {void}
 	 */
-	detach() {
-		// まずイベント解除（displayElementがswap後の可能性があるので先に外す）
-		this.unbindEvents();
-
+	restoreSeparateValue() {
 		// swapしていないならここで終わり
 		if (!this.swapState) {
 			return;
@@ -410,17 +549,28 @@ class InputGuard {
 		// class を戻す
 		raw.className = state.originalClass ?? "";
 
-		// data属性（jpig用）は消しておく
-		delete raw.dataset.jpigRole;
+		// data属性（tig用）は消しておく
+		delete raw.dataset.tigRole;
+		delete raw.dataset.tigOriginalId;
+		delete raw.dataset.tigOriginalName;
 
 		// elements参照を original に戻す
 		this.hostElement = this.originalElement;
 		this.displayElement = this.originalElement;
 		this.rawElement = null;
+	}
 
+	/**
+	 * ガード解除
+	 * @returns {void}
+	 */
+	detach() {
+		// イベント解除（displayElementがswap後の可能性があるので先に外す）
+		this.unbindEvents();
+		// swap復元
+		this.restoreSeparateValue();
 		// swapState破棄
 		this.swapState = null;
-
 		// 以後このインスタンスは利用不能にしてもいいが、今回は明示しない
 	}
 
@@ -443,7 +593,7 @@ class InputGuard {
 
 			if (!supports) {
 				warnLog(
-					`[jp-input-guard] Rule "${rule.name}" is not supported for <${this.kind}>. skipped.`,
+					`[text-input-guard] Rule "${rule.name}" is not supported for <${this.kind}>. skipped.`,
 					this.warn
 				);
 				continue;
@@ -476,6 +626,15 @@ class InputGuard {
 		this.displayElement.addEventListener("compositionend", this.onCompositionEnd);
 		this.displayElement.addEventListener("input", this.onInput);
 		this.displayElement.addEventListener("blur", this.onBlur);
+
+		// フォーカスで編集用に戻す
+		this.displayElement.addEventListener("focus", this.onFocus);
+
+		// キャレット/選択範囲の変化を拾う（block時の不自然ジャンプ対策）
+		this.displayElement.addEventListener("keyup", this.onSelectionChange);
+		this.displayElement.addEventListener("mouseup", this.onSelectionChange);
+		this.displayElement.addEventListener("select", this.onSelectionChange);
+		this.displayElement.addEventListener("focus", this.onSelectionChange);
 	}
 
 	/**
@@ -487,6 +646,41 @@ class InputGuard {
 		this.displayElement.removeEventListener("compositionend", this.onCompositionEnd);
 		this.displayElement.removeEventListener("input", this.onInput);
 		this.displayElement.removeEventListener("blur", this.onBlur);
+		this.displayElement.removeEventListener("focus", this.onFocus);
+		this.displayElement.removeEventListener("keyup", this.onSelectionChange);
+		this.displayElement.removeEventListener("mouseup", this.onSelectionChange);
+		this.displayElement.removeEventListener("select", this.onSelectionChange);
+		this.displayElement.removeEventListener("focus", this.onSelectionChange);
+	}
+
+	/**
+	 * 直前の受理値へ巻き戻す（表示値＋raw同期＋selection復元）
+	 * - block用途なので、余計な正規化/formatは走らせずに戻す
+	 * @param {RevertRequest} req
+	 * @returns {void}
+	 */
+	revertDisplay(req) {
+		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+
+		// いまの入力を取り消して、直前の受理値へ戻す
+		display.value = this.lastAcceptedValue;
+
+		// selection復元（取れている場合のみ）
+		this.writeSelection(display, this.lastAcceptedSelection);
+
+		// raw も同じ値へ（swapでも整合する）
+		this.syncRaw(this.lastAcceptedValue);
+
+		// block なので、エラー表示は基本クリア（「入らなかった」だけにする）
+		this.clearErrors();
+		this.applyInvalidClass();
+
+		// 連鎖防止（次の処理に持ち越さない）
+		this.revertRequest = null;
+
+		if (this.warn) {
+			console.log(`[text-input-guard] reverted: ${req.reason}`, req.detail);
+		}
 	}
 
 	/**
@@ -502,7 +696,13 @@ class InputGuard {
 			warn: this.warn,
 			invalidClass: this.invalidClass,
 			composing: this.composing,
-			pushError: (e) => this.errors.push(e)
+			pushError: (e) => this.errors.push(e),
+			requestRevert: (req) => {
+				// 1回でもrevert要求が出たら採用（最初の理由を保持）
+				if (!this.revertRequest) {
+					this.revertRequest = req;
+				}
+			}
 		};
 	}
 
@@ -517,11 +717,10 @@ class InputGuard {
 	/**
 	 * normalize.char フェーズを実行する（文字の正規化）
 	 * @param {string} value
+ 	 * @param {GuardContext} ctx
 	 * @returns {string}
 	 */
-	/** @param {string} value */
-	runNormalizeChar(value) {
-		const ctx = this.createCtx();
+	runNormalizeChar(value, ctx) {
 		let v = value;
 		for (const rule of this.normalizeCharRules) {
 			v = rule.normalizeChar ? rule.normalizeChar(v, ctx) : v;
@@ -532,10 +731,10 @@ class InputGuard {
 	/**
 	 * normalize.structure フェーズを実行する（構造の正規化）
 	 * @param {string} value
+ 	 * @param {GuardContext} ctx
 	 * @returns {string}
 	 */
-	runNormalizeStructure(value) {
-		const ctx = this.createCtx();
+	runNormalizeStructure(value, ctx) {
 		let v = value;
 		for (const rule of this.normalizeStructureRules) {
 			v = rule.normalizeStructure ? rule.normalizeStructure(v, ctx) : v;
@@ -546,10 +745,10 @@ class InputGuard {
 	/**
 	 * validate フェーズを実行する（エラーを積むだけで、値は変えない想定）
 	 * @param {string} value
+ 	 * @param {GuardContext} ctx
 	 * @returns {void}
 	 */
-	runValidate(value) {
-		const ctx = this.createCtx();
+	runValidate(value, ctx) {
 		for (const rule of this.validateRules) {
 			if (rule.validate) {
 				rule.validate(value, ctx);
@@ -560,10 +759,10 @@ class InputGuard {
 	/**
 	 * fix フェーズを実行する（commit時のみ：切り捨て/四捨五入などの穏やか補正）
 	 * @param {string} value
+ 	 * @param {GuardContext} ctx
 	 * @returns {string}
 	 */
-	runFix(value) {
-		const ctx = this.createCtx();
+	runFix(value, ctx) {
 		let v = value;
 		for (const rule of this.fixRules) {
 			v = rule.fix ? rule.fix(v, ctx) : v;
@@ -574,10 +773,10 @@ class InputGuard {
 	/**
 	 * format フェーズを実行する（commit時のみ：カンマ付与など表示整形）
 	 * @param {string} value
+ 	 * @param {GuardContext} ctx
 	 * @returns {string}
 	 */
-	runFormat(value) {
-		const ctx = this.createCtx();
+	runFormat(value, ctx) {
 		let v = value;
 		for (const rule of this.formatRules) {
 			v = rule.format ? rule.format(v, ctx) : v;
@@ -625,17 +824,29 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onCompositionStart() {
+		console.log("[text-input-guard] compositionstart");
 		this.composing = true;
 	}
 
 	/**
 	 * IME変換終了：composition中フラグを下ろす
-	 * - 直後に input イベントが飛ぶので、ここでは評価しない
+	 * - 環境によって input が飛ばない/遅れるので、ここでフォールバック評価を入れる
 	 * @returns {void}
 	 */
 	onCompositionEnd() {
+		console.log("[text-input-guard] compositionend");
 		this.composing = false;
-		// compositionend後にinputイベントが飛ぶので、ここでは触らない
+
+		// compositionend後に input が来ない環境向けのフォールバック
+		this.pendingCompositionCommit = true;
+
+		queueMicrotask(() => {
+			// その後 input で処理済みなら何もしない
+			if (!this.pendingCompositionCommit) { return; }
+
+			this.pendingCompositionCommit = false;
+			this.evaluateInput();
+		});
 	}
 
 	/**
@@ -643,6 +854,9 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onInput() {
+		console.log("[text-input-guard] input");
+		// compositionend後に input が来た場合、フォールバックを無効化
+		this.pendingCompositionCommit = false;
 		this.evaluateInput();
 	}
 
@@ -651,7 +865,89 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onBlur() {
+		console.log("[text-input-guard] blur");
 		this.evaluateCommit();
+	}
+
+	/**
+	 * focusイベント：表示整形（カンマ等）を剥がして編集しやすい状態にする
+	 * - validate は走らせない（触っただけで赤くしたくないため）
+	 * @returns {void}
+	 */
+	onFocus() {
+		if (this.composing) { return; }
+
+		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		const current = display.value;
+
+		const ctx = this.createCtx();
+
+		let v = current;
+		v = this.runNormalizeChar(v, ctx);       // カンマ除去が効く
+		v = this.runNormalizeStructure(v, ctx);
+
+		if (v !== current) {
+			this.setDisplayValuePreserveCaret(display, v, ctx);
+			this.syncRaw(v);
+		}
+
+		// 受理値更新（blockで戻す位置も自然になる）
+		this.lastAcceptedValue = v;
+		this.lastAcceptedSelection = this.readSelection(display);
+
+		// キャレット/選択範囲の変化も反映しておく（blockで戻す位置も自然になる）
+		this.onSelectionChange();
+	}
+
+	/**
+	 * キャレット/選択範囲の変化を lastAcceptedSelection に反映する
+	 * - 値が変わっていない状態でもキャレットは動くため、block時に自然な位置へ戻すために使う
+	 * @returns {void}
+	 */
+	onSelectionChange() {
+		// IME変換中は無視（この間はキャレット位置が不安定になることがあるため）
+		if (this.composing) {
+			return;
+		}
+		const el = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		this.lastAcceptedSelection = this.readSelection(el);
+	}
+
+	/**
+	 * display.value を更新しつつ、可能ならカーソル位置を保つ（入力中用）
+	 * - 文字が削除される/増える可能性があるので、左側だけ正規化した長さで補正する
+	 * @param {HTMLInputElement|HTMLTextAreaElement} el
+	 * @param {string} nextValue
+	 * @param {GuardContext} ctx
+	 * @returns {void}
+	 */
+	setDisplayValuePreserveCaret(el, nextValue, ctx) {
+		const prevValue = el.value;
+		if (prevValue === nextValue) { return; }
+
+		const start = el.selectionStart;
+		const end = el.selectionEnd;
+
+		// selectionが取れないなら単純代入
+		if (start == null || end == null) {
+			el.value = nextValue;
+			return;
+		}
+
+		// 左側の文字列を「同じ正規化」で処理して、新しいカーソル位置を推定
+		const leftPrev = prevValue.slice(0, start);
+		let leftNext = leftPrev;
+		leftNext = this.runNormalizeChar(leftNext, ctx);
+		leftNext = this.runNormalizeStructure(leftNext, ctx);
+
+		el.value = nextValue;
+
+		const newPos = Math.min(leftNext.length, nextValue.length);
+		try {
+			el.setSelectionRange(newPos, newPos);
+		} catch (_e) {
+			// type=hidden/number などでは例外の可能性があるが、ここはtext想定
+		}
 	}
 
 	/**
@@ -666,32 +962,47 @@ class InputGuard {
 		}
 
 		this.clearErrors();
+		this.revertRequest = null;
 
 		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
 		const current = display.value;
 
-		let v = current;
-		// 固定順
-		v = this.runNormalizeChar(v);
-		v = this.runNormalizeStructure(v);
+		const ctx = this.createCtx();
 
-		// normalizeで変わったら反映（selection補正は後で）
-		if (v !== current) {
-			this.syncDisplay(v);
+		// raw候補（入力中は表示値＝rawとして扱う）
+		let raw = current;
+
+		raw = this.runNormalizeChar(raw, ctx);
+		raw = this.runNormalizeStructure(raw, ctx);
+
+		// normalizeで変わったら反映（selection補正）
+		if (raw !== current) {
+			this.setDisplayValuePreserveCaret(display, raw, ctx);
 		}
 
 		// validate（入力中：エラー出すだけ）
-		this.runValidate(v);
+		this.runValidate(raw, ctx);
 
-		// rawは常に最新に
-		this.syncRaw(v);
+		// revert要求が出たら巻き戻して終了
+		if (this.revertRequest) {
+			this.revertDisplay(this.revertRequest);
+			return;
+		}
+
+		// rawは常に最新に（swapでも非swapでもOK）
+		this.syncRaw(raw);
 
 		this.applyInvalidClass();
+
+		// 受理値は常にrawとして保存（revert先・getRawValueの一貫性）
+		this.lastAcceptedValue = raw;
+		this.lastAcceptedSelection = this.readSelection(display);
 	}
 
 	/**
 	 * 確定時（blur）の評価（IME中は何もしない）
 	 * - 固定順：normalize.char → normalize.structure → validate → fix → format
+	 * - raw は format 前、display は format 後
 	 * @returns {void}
 	 */
 	evaluateCommit() {
@@ -700,22 +1011,54 @@ class InputGuard {
 		}
 
 		this.clearErrors();
+		this.revertRequest = null;
 
-		let v = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement).value;
+		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		const ctx = this.createCtx();
 
-		v = this.runNormalizeChar(v);
-		v = this.runNormalizeStructure(v);
+		// 1) raw候補（displayから取得）
+		let raw = display.value;
 
-		this.runValidate(v);
+		// 2) 正規化（rawとして扱う形に揃える）
+		raw = this.runNormalizeChar(raw, ctx);
+		raw = this.runNormalizeStructure(raw, ctx);
 
-		// commitのみ
-		v = this.runFix(v);
-		v = this.runFormat(v);
+		// 3) 入力内容の検査（fix前）
+		this.runValidate(raw, ctx);
 
-		this.syncDisplay(v);
-		this.syncRaw(v);
+		// block要求があれば戻す（将来用）
+		if (this.revertRequest) {
+			this.revertDisplay(this.revertRequest);
+			return;
+		}
+
+		// 4) commitのみの補正（丸め・切り捨て・繰り上がりなど）
+		raw = this.runFix(raw, ctx);
+
+		// 5) 最終rawで検査し直す（fixで値が変わった場合に対応）
+		this.clearErrors();
+		this.revertRequest = null;
+		this.runValidate(raw, ctx);
+
+		if (this.revertRequest) {
+			this.revertDisplay(this.revertRequest);
+			return;
+		}
+
+		// 6) raw同期（format前を入れる）
+		this.syncRaw(raw);
+
+		// 7) 表示用は format 後（カンマ等）
+		let shown = raw;
+		shown = this.runFormat(shown, ctx);
+
+		this.syncDisplay(shown);
 
 		this.applyInvalidClass();
+
+		// 8) 受理値は raw を保持（revertやgetRawValueが安定する）
+		this.lastAcceptedValue = raw;
+		this.lastAcceptedSelection = this.readSelection(display);
 	}
 
 	/**
@@ -728,7 +1071,7 @@ class InputGuard {
 
 	/**
 	 * エラー配列のコピーを返す（外から破壊されないように slice）
-	 * @returns {JpigError[]}
+	 * @returns {TigError[]}
 	 */
 	getErrors() {
 		return this.errors.slice();
@@ -755,239 +1098,8 @@ class InputGuard {
 			detach: () => this.detach(),
 			isValid: () => this.isValid(),
 			getErrors: () => this.getErrors(),
-			getRawValue: () => this.getRawValue()
+			getRawValue: () => this.getRawValue(),
+			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement)
 		};
 	}
 }
-
-/**
- * The script is part of JPInputGuard.
- *
- * AUTHOR:
- *  natade-jp (https://github.com/natade-jp)
- *
- * LICENSE:
- *  The MIT license https://opensource.org/licenses/MIT
- */
-
-/**
- * numeric ルールのオプション
- * @typedef {Object} NumericRuleOptions
- * @property {boolean} [allowFullWidth=true] - 全角数字/記号を許可して半角へ正規化する
- * @property {boolean} [allowMinus=false] - マイナス記号を許可する（先頭のみ）
- * @property {boolean} [allowDecimal=false] - 小数点を許可する（1つだけ）
- */
-
-/**
- * 数値入力向けルールを生成する
- * - normalize.char: 全角→半角、記号統一、不要文字の除去
- * - normalize.structure: 「-は先頭のみ」「.は1つだけ」など構造を整える
- * - fix: 確定時（blur）に「-」「.」「-.」や末尾の「.」を空/削除にする
- *
- * @param {NumericRuleOptions} [options]
- * @returns {Rule}
- */
-function numeric(options = {}) {
-	const opt = {
-		allowFullWidth: options.allowFullWidth ?? true,
-		allowMinus: options.allowMinus ?? false,
-		allowDecimal: options.allowDecimal ?? false
-	};
-
-	/** @type {Set<string>} */
-	const minusLike = new Set([
-		"－", // FULLWIDTH HYPHEN-MINUS
-		"−", // MINUS SIGN
-		"‐", // HYPHEN
-		"-", // NON-BREAKING HYPHEN
-		"‒", // FIGURE DASH
-		"–", // EN DASH
-		"—", // EM DASH
-		"―" // HORIZONTAL BAR
-	]);
-
-	/** @type {Set<string>} */
-	const dotLike = new Set([
-		"．", // FULLWIDTH FULL STOP
-		"。", // IDEOGRAPHIC FULL STOP
-		"｡" // HALFWIDTH IDEOGRAPHIC FULL STOP
-	]);
-
-	/**
-	 * 全角数字（０〜９）を半角へ
-	 * @param {string} ch
-	 * @returns {string|null} 変換した1文字（対象外ならnull）
-	 */
-	function toHalfWidthDigit(ch) {
-		const code = ch.charCodeAt(0);
-		// '０'(FF10) .. '９'(FF19)
-		if (0xFF10 <= code && code <= 0xFF19) {
-			return String.fromCharCode(code - 0xFF10 + 0x30);
-		}
-		return null;
-	}
-
-	/**
-	 * 1文字を「数字 / - / .」へ正規化する（許可されない場合は空）
-	 * @param {string} ch
-	 * @returns {string} 正規化後の文字（除去なら ""）
-	 */
-	function normalizeChar1(ch) {
-		// 半角数字
-		if (ch >= "0" && ch <= "9") {
-			return ch;
-		}
-
-		// 全角数字
-		if (opt.allowFullWidth) {
-			const d = toHalfWidthDigit(ch);
-			if (d) {
-				return d;
-			}
-		}
-
-		// 小数点
-		if (ch === ".") {
-			return opt.allowDecimal ? "." : "";
-		}
-		if (opt.allowFullWidth && dotLike.has(ch)) {
-			return opt.allowDecimal ? "." : "";
-		}
-
-		// マイナス
-		if (ch === "-") {
-			return opt.allowMinus ? "-" : "";
-		}
-		if (opt.allowFullWidth && minusLike.has(ch)) {
-			return opt.allowMinus ? "-" : "";
-		}
-		// 明示的に不要（+ や指数表記など）
-		if (ch === "+" || ch === "＋") {
-			return "";
-		}
-		if (ch === "e" || ch === "E" || ch === "ｅ" || ch === "Ｅ") {
-			return "";
-		}
-
-		// その他は全部除去
-		return "";
-	}
-
-	return {
-		name: "numeric",
-		targets: ["input"],
-
-		/**
-		 * 文字単位の正規化（全角→半角、記号統一、不要文字の除去）
-		 * @param {string} value
-		 * @returns {string}
-		 */
-		normalizeChar(value) {
-			let out = "";
-			for (const ch of String(value)) {
-				out += normalizeChar1(ch);
-			}
-			return out;
-		},
-
-		/**
-		 * 構造正規化（-は先頭のみ、.は1つだけ）
-		 * @param {string} value
-		 * @returns {string}
-		 */
-		normalizeStructure(value) {
-			let out = "";
-			let seenMinus = false;
-			let seenDot = false;
-
-			for (const ch of String(value)) {
-				if (ch >= "0" && ch <= "9") {
-					out += ch;
-					continue;
-				}
-
-				if (ch === "-" && opt.allowMinus) {
-					// マイナスは先頭のみ、1回だけ
-					if (!seenMinus && out.length === 0) {
-						out += "-";
-						seenMinus = true;
-					}
-					continue;
-				}
-
-				if (ch === "." && opt.allowDecimal) {
-					// 小数点は1つだけ（位置制約は設けない：digits側で精度などを管理）
-					if (!seenDot) {
-						out += ".";
-						seenDot = true;
-					}
-					continue;
-				}
-
-				// その他は捨てる（normalizeCharでほぼ落ちてる想定）
-			}
-
-			return out;
-		},
-
-		/**
-		 * 確定時にだけ消したい “未完成な数値” を整える
-		 * - "-" / "." / "-." は空にする
-		 * - 末尾の "." は削除する（"12." → "12"）
-		 * @param {string} value
-		 * @returns {string}
-		 */
-		fix(value) {
-			const v = String(value);
-
-			if (v === "-" || v === "." || v === "-.") {
-				return "";
-			}
-
-			if (v.endsWith(".")) {
-				return v.slice(0, -1);
-			}
-
-			return v;
-		},
-
-		/**
-		 * numeric単体では基本エラーを出さない（入力途中を許容するため）
-		 * ここでエラーにしたい場合は、将来オプションで強制できるようにしてもOK
-		 * @param {string} _value
-		 * @param {any} _ctx
-		 * @returns {void}
-		 */
-		validate(_value, _ctx) {
-			// no-op
-		}
-	};
-}
-
-/**
- * JP Input Guard - Public Entry
- * - ESM/CJS では named export（attach / rules / numeric...）
- * - UMD では globalName で指定したグローバル（例: window.JPInputGuard）に同じ形で露出させる
- *
- * AUTHOR:
- *  natade-jp (https://github.com/natade-jp)
- *
- * LICENSE:
- *  The MIT license https://opensource.org/licenses/MIT
- */
-
-
-/**
- * ルール生成関数の名前空間（rules.xxx(...) で使う）
- */
-const rules = {
-	numeric
-};
-
-/**
- * バージョン（ビルド時に置換したいならここを差し替える）
- * 例: rollup replace で "__VERSION__" を package.json の version に置換
- */
-const version = "0.0.1";
-
-export { attach, numeric, rules, version };

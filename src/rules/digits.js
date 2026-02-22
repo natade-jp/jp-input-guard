@@ -1,5 +1,5 @@
 /**
- * The script is part of JPInputGuard.
+ * The script is part of TextInputGuard.
  *
  * AUTHOR:
  *  natade-jp (https://github.com/natade-jp)
@@ -150,7 +150,7 @@ function roundFraction(intPart, fracPart, fracLimit) {
 /**
  * digits ルールを生成する
  * @param {DigitsRuleOptions} [options]
- * @returns {import("../jp-input-guard.js").Rule}
+ * @returns {import("../text-input-guard.js").Rule}
  */
 export function digits(options = {}) {
 	const opt = {
@@ -170,7 +170,7 @@ export function digits(options = {}) {
 		/**
 		 * 桁数チェック（入力中：エラーを積むだけ）
 		 * @param {string} value
-		 * @param {import("../jp-input-guard.js").GuardContext} ctx
+		 * @param {import("../text-input-guard.js").GuardContext} ctx
 		 * @returns {void}
 		 */
 		validate(value, ctx) {
@@ -232,7 +232,7 @@ export function digits(options = {}) {
 		 * - 整数部: truncateLeft / truncateRight / clamp
 		 * - 小数部: truncate / round
 		 * @param {string} value
-		 * @param {import("../jp-input-guard.js").GuardContext} _ctx
+		 * @param {import("../text-input-guard.js").GuardContext} _ctx
 		 * @returns {string}
 		 */
 		fix(value, _ctx) {
@@ -291,26 +291,26 @@ export function digits(options = {}) {
 
 /**
  * datasetから digits ルールを生成する
- * - data-jpig-rules-digits が無ければ null
- * - オプションは data-jpig-rules-digits-xxx から読む
+ * - data-tig-rules-digits が無ければ null
+ * - オプションは data-tig-rules-digits-xxx から読む
  *
  * 対応する data 属性（dataset 名）
- * - data-jpig-rules-digits                          -> dataset.jpigRulesDigits
- * - data-jpig-rules-digits-int                      -> dataset.jpigRulesDigitsInt
- * - data-jpig-rules-digits-frac                     -> dataset.jpigRulesDigitsFrac
- * - data-jpig-rules-digits-count-leading-zeros      -> dataset.jpigRulesDigitsCountLeadingZeros
- * - data-jpig-rules-digits-fix-int-on-blur          -> dataset.jpigRulesDigitsFixIntOnBlur
- * - data-jpig-rules-digits-fix-frac-on-blur         -> dataset.jpigRulesDigitsFixFracOnBlur
- * - data-jpig-rules-digits-overflow-input-int       -> dataset.jpigRulesDigitsOverflowInputInt
- * - data-jpig-rules-digits-overflow-input-frac      -> dataset.jpigRulesDigitsOverflowInputFrac
+ * - data-tig-rules-digits                          -> dataset.tigRulesDigits
+ * - data-tig-rules-digits-int                      -> dataset.tigRulesDigitsInt
+ * - data-tig-rules-digits-frac                     -> dataset.tigRulesDigitsFrac
+ * - data-tig-rules-digits-count-leading-zeros      -> dataset.tigRulesDigitsCountLeadingZeros
+ * - data-tig-rules-digits-fix-int-on-blur          -> dataset.tigRulesDigitsFixIntOnBlur
+ * - data-tig-rules-digits-fix-frac-on-blur         -> dataset.tigRulesDigitsFixFracOnBlur
+ * - data-tig-rules-digits-overflow-input-int       -> dataset.tigRulesDigitsOverflowInputInt
+ * - data-tig-rules-digits-overflow-input-frac      -> dataset.tigRulesDigitsOverflowInputFrac
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
- * @returns {import("../jp-input-guard.js").Rule|null}
+ * @returns {import("../text-input-guard.js").Rule|null}
  */
 digits.fromDataset = function fromDataset(dataset, _el) {
 	// ON判定
-	if (dataset.jpigRulesDigits == null) {
+	if (dataset.tigRulesDigits == null) {
 		return null;
 	}
 
@@ -318,24 +318,24 @@ digits.fromDataset = function fromDataset(dataset, _el) {
 	const options = {};
 
 	// int / frac
-	const intN = parseDatasetNumber(dataset.jpigRulesDigitsInt);
+	const intN = parseDatasetNumber(dataset.tigRulesDigitsInt);
 	if (intN != null) {
 		options.int = intN;
 	}
 
-	const fracN = parseDatasetNumber(dataset.jpigRulesDigitsFrac);
+	const fracN = parseDatasetNumber(dataset.tigRulesDigitsFrac);
 	if (fracN != null) {
 		options.frac = fracN;
 	}
 
 	// countLeadingZeros
-	const clz = parseDatasetBool(dataset.jpigRulesDigitsCountLeadingZeros);
+	const clz = parseDatasetBool(dataset.tigRulesDigitsCountLeadingZeros);
 	if (clz != null) {
 		options.countLeadingZeros = clz;
 	}
 
 	// fixIntOnBlur / fixFracOnBlur
-	const fixInt = parseDatasetEnum(dataset.jpigRulesDigitsFixIntOnBlur, [
+	const fixInt = parseDatasetEnum(dataset.tigRulesDigitsFixIntOnBlur, [
 		"none",
 		"truncateLeft",
 		"truncateRight",
@@ -345,7 +345,7 @@ digits.fromDataset = function fromDataset(dataset, _el) {
 		options.fixIntOnBlur = fixInt;
 	}
 
-	const fixFrac = parseDatasetEnum(dataset.jpigRulesDigitsFixFracOnBlur, [
+	const fixFrac = parseDatasetEnum(dataset.tigRulesDigitsFixFracOnBlur, [
 		"none",
 		"truncate",
 		"round"
@@ -355,12 +355,12 @@ digits.fromDataset = function fromDataset(dataset, _el) {
 	}
 
 	// overflowInputInt / overflowInputFrac
-	const ovInt = parseDatasetEnum(dataset.jpigRulesDigitsOverflowInputInt, ["none", "block"]);
+	const ovInt = parseDatasetEnum(dataset.tigRulesDigitsOverflowInputInt, ["none", "block"]);
 	if (ovInt != null) {
 		options.overflowInputInt = ovInt;
 	}
 
-	const ovFrac = parseDatasetEnum(dataset.jpigRulesDigitsOverflowInputFrac, ["none", "block"]);
+	const ovFrac = parseDatasetEnum(dataset.tigRulesDigitsOverflowInputFrac, ["none", "block"]);
 	if (ovFrac != null) {
 		options.overflowInputFrac = ovFrac;
 	}

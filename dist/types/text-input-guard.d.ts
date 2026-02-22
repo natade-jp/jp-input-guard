@@ -6,6 +6,37 @@
  */
 declare function attach(element: HTMLInputElement | HTMLTextAreaElement, options?: AttachOptions): Guard;
 /**
+ * @typedef {Object} GuardGroup
+ * @property {() => void} detach - 全部 detach
+ * @property {() => boolean} isValid - 全部 valid なら true
+ * @property {() => TigError[]} getErrors - 全部のエラーを集約
+ * @property {() => Guard[]} getGuards - 個別Guard配列
+ */
+/**
+ * @param {Iterable<HTMLInputElement|HTMLTextAreaElement>} elements
+ * @param {AttachOptions} [options]
+ * @returns {GuardGroup}
+ */
+declare function attachAll(elements: Iterable<HTMLInputElement | HTMLTextAreaElement>, options?: AttachOptions): GuardGroup;
+type GuardGroup = {
+    /**
+     * - 全部 detach
+     */
+    detach: () => void;
+    /**
+     * - 全部 valid なら true
+     */
+    isValid: () => boolean;
+    /**
+     * - 全部のエラーを集約
+     */
+    getErrors: () => TigError[];
+    /**
+     * - 個別Guard配列
+     */
+    getGuards: () => Guard[];
+};
+/**
  * 対象要素の種別（現在は input と textarea のみ対応）
  */
 type ElementKind = "input" | "textarea";
@@ -17,7 +48,7 @@ type PhaseName = "normalize.char" | "normalize.structure" | "validate" | "fix" |
 /**
  * バリデーションエラー情報を表すオブジェクト
  */
-type JpigError = {
+type TigError = {
     /**
      * - エラー識別子（例: "digits.int_overflow"）
      */
@@ -50,11 +81,15 @@ type Guard = {
     /**
      * - エラー一覧を取得
      */
-    getErrors: () => JpigError[];
+    getErrors: () => TigError[];
     /**
      * - 送信用の正規化済み値を取得
      */
     getRawValue: () => string;
+    /**
+     * - ユーザーが実際に操作している要素（swap時はdisplay側）
+     */
+    getDisplayElement: () => HTMLInputElement | HTMLTextAreaElement;
 };
 /**
  * 各ルールに渡される実行コンテキスト
@@ -92,7 +127,11 @@ type GuardContext = {
     /**
      * - エラーを登録する関数
      */
-    pushError: (e: JpigError) => void;
+    pushError: (e: TigError) => void;
+    /**
+     * - 入力を直前の受理値へ巻き戻す要求
+     */
+    requestRevert: (req: RevertRequest) => void;
 };
 /**
  * 1つの入力制御ルール定義
@@ -129,6 +168,17 @@ type Rule = {
     format?: (value: string, ctx: GuardContext) => string;
 };
 /**
+ * 表示値(display)と内部値(raw)の分離設定
+ */
+type SeparateValueOptions = {
+    /**
+     * - "auto": format系ルールがある場合のみ自動でswapする（既定）
+     * - "swap": 常にswapする（inputのみ対応）
+     * - "off": 分離しない（displayとrawを同一に扱う）
+     */
+    mode?: "auto" | "swap" | "off";
+};
+/**
  * attach() に渡す設定オプション
  */
 type AttachOptions = {
@@ -145,11 +195,9 @@ type AttachOptions = {
      */
     invalidClass?: string;
     /**
-     * - 表示/内部値分離設定（v0.1はinputのswapのみ対応）
+     * - 表示値と内部値の分離設定
      */
-    separateValue?: {
-        mode?: "swap" | "off";
-    };
+    separateValue?: SeparateValueOptions;
 };
 /**
  * swap時に退避する元inputの情報
@@ -177,6 +225,36 @@ type SwapState = {
      */
     createdDisplay: HTMLInputElement;
 };
+/**
+ * selection（カーソル/選択範囲）の退避情報
+ */
+type SelectionState = {
+    /**
+     * - selectionStart
+     */
+    start: number | null;
+    /**
+     * - selectionEnd
+     */
+    end: number | null;
+    /**
+     * - selectionDirection
+     */
+    direction: "forward" | "backward" | "none" | null;
+};
+/**
+ * revert要求（入力を巻き戻す指示）
+ */
+type RevertRequest = {
+    /**
+     * - ルール名や理由（例: "digits.int_overflow"）
+     */
+    reason: string;
+    /**
+     * - デバッグ用の詳細
+     */
+    detail?: any;
+};
 
-export { attach };
-export type { AttachOptions, ElementKind, Guard, GuardContext, JpigError, PhaseName, Rule, SwapState };
+export { attach, attachAll };
+export type { AttachOptions, ElementKind, Guard, GuardContext, GuardGroup, PhaseName, RevertRequest, Rule, SelectionState, SeparateValueOptions, SwapState, TigError };
