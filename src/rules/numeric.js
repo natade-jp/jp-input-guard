@@ -16,6 +16,7 @@ import { parseDatasetBool } from "./_dataset.js";
  * @property {boolean} [allowFullWidth=true] - 全角数字/記号を許可して半角へ正規化する
  * @property {boolean} [allowMinus=false] - マイナス記号を許可する（先頭のみ）
  * @property {boolean} [allowDecimal=false] - 小数点を許可する（1つだけ）
+ * @property {boolean} [allowEmpty=true] - 空文字を許可するか
  */
 
 /**
@@ -31,7 +32,8 @@ export function numeric(options = {}) {
 	const opt = {
 		allowFullWidth: options.allowFullWidth ?? true,
 		allowMinus: options.allowMinus ?? false,
-		allowDecimal: options.allowDecimal ?? false
+		allowDecimal: options.allowDecimal ?? false,
+		allowEmpty: options.allowEmpty ?? true
 	};
 
 	/** @type {Set<string>} */
@@ -189,9 +191,14 @@ export function numeric(options = {}) {
 		fix(value) {
 			let v = String(value);
 
+			// 空文字の扱い
+			if (v === "") {
+				return opt.allowEmpty ? "" : "0";
+			}
+
 			// 未完成な数値は空にする
 			if (v === "-" || v === "." || v === "-.") {
-				return "";
+				return opt.allowEmpty ? "" : "0";
 			}
 
 			// "-.1" → "-0.1"
@@ -263,6 +270,7 @@ export function numeric(options = {}) {
  * - data-tig-rules-numeric-allow-full-width      -> dataset.tigRulesNumericAllowFullWidth
  * - data-tig-rules-numeric-allow-minus           -> dataset.tigRulesNumericAllowMinus
  * - data-tig-rules-numeric-allow-decimal         -> dataset.tigRulesNumericAllowDecimal
+ * - data-tig-rules-numeric-allow-empty           -> dataset.tigRulesNumericAllowEmpty
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
@@ -293,6 +301,12 @@ numeric.fromDataset = function fromDataset(dataset, _el) {
 	const allowDecimal = parseDatasetBool(dataset.tigRulesNumericAllowDecimal);
 	if (allowDecimal != null) {
 		options.allowDecimal = allowDecimal;
+	}
+
+	// data-tig-rules-numeric-allow-empty（未指定なら numeric側デフォルト true）
+	const allowEmpty = parseDatasetBool(dataset.tigRulesNumericAllowEmpty);
+	if (allowEmpty != null) {
+		options.allowEmpty = allowEmpty;
 	}
 
 	return numeric(options);
