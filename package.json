@@ -2,8 +2,7 @@
 	"name": "text-input-guard",
 	"version": "0.0.1",
 	"description": "test",
-	"keywords": [
-	],
+	"keywords": [],
 	"author": "natade-jp <natade3@gmail.com> (https://github.com/natade-jp)",
 	"license": "MIT",
 	"type": "module",
@@ -35,7 +34,7 @@
 	],
 	"scripts": {
 		"build": "node ./scripts/package.build.js",
-		"test": "node --test",
+		"test": "node --test \"src/**/*.test.js\"",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier . --write",
@@ -58,6 +57,7 @@
 		"eslint-plugin-jsonc": "^2.21.0",
 		"eslint-plugin-unicorn": "^62.0.0",
 		"globals": "^17.1.0",
+		"jsdom": "^28.1.0",
 		"jsonc-eslint-parser": "^2.4.2",
 		"ntfile": "^2.0.0",
 		"prettier": "^3.8.1",

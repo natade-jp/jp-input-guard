@@ -20,6 +20,11 @@ export function comma() {
 
 		/**
 		 * 表示整形（確定時のみ）
+		 *
+		 * 前提:
+		 * - numeric / digits 等で正規化済みの数値文字列が渡される
+		 * - 整数部・小数部・符号のみを含む（カンマは含まない想定）
+		 *
 		 * @param {string} value
 		 * @returns {string}
 		 */

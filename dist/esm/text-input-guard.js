@@ -200,7 +200,7 @@ class InputGuard {
 
 		const kind = detectKind(element);
 		if (!kind) {
-			throw new TypeError("[jp-input-guard] attach() expects an <input> or <textarea> element.");
+			throw new TypeError("[text-input-guard] attach() expects an <input> or <textarea> element.");
 		}
 
 		/**
@@ -432,7 +432,7 @@ class InputGuard {
 		}
 
 		if (this.kind !== "input") {
-			warnLog('[jp-input-guard] separateValue.mode="swap" is not supported for <textarea>. ignored.', this.warn);
+			warnLog('[text-input-guard] separateValue.mode="swap" is not supported for <textarea>. ignored.', this.warn);
 			return;
 		}
 
@@ -593,7 +593,7 @@ class InputGuard {
 
 			if (!supports) {
 				warnLog(
-					`[jp-input-guard] Rule "${rule.name}" is not supported for <${this.kind}>. skipped.`,
+					`[text-input-guard] Rule "${rule.name}" is not supported for <${this.kind}>. skipped.`,
 					this.warn
 				);
 				continue;
@@ -679,7 +679,7 @@ class InputGuard {
 		this.revertRequest = null;
 
 		if (this.warn) {
-			console.log(`[jp-input-guard] reverted: ${req.reason}`, req.detail);
+			console.log(`[text-input-guard] reverted: ${req.reason}`, req.detail);
 		}
 	}
 
@@ -824,7 +824,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onCompositionStart() {
-		console.log("[jp-input-guard] compositionstart");
+		console.log("[text-input-guard] compositionstart");
 		this.composing = true;
 	}
 
@@ -834,7 +834,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onCompositionEnd() {
-		console.log("[jp-input-guard] compositionend");
+		console.log("[text-input-guard] compositionend");
 		this.composing = false;
 
 		// compositionend後に input が来ない環境向けのフォールバック
@@ -854,7 +854,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onInput() {
-		console.log("[jp-input-guard] input");
+		console.log("[text-input-guard] input");
 		// compositionend後に input が来た場合、フォールバックを無効化
 		this.pendingCompositionCommit = false;
 		this.evaluateInput();
@@ -865,7 +865,7 @@ class InputGuard {
 	 * @returns {void}
 	 */
 	onBlur() {
-		console.log("[jp-input-guard] blur");
+		console.log("[text-input-guard] blur");
 		this.evaluateCommit();
 	}
 
@@ -1115,6 +1115,63 @@ class InputGuard {
  */
 
 /**
+ * datasetのboolean値を解釈する
+ * - 未指定なら undefined
+ * - "" / "true" / "1" / "yes" / "on" は true
+ * - "false" / "0" / "no" / "off" は false
+ * @param {string|undefined} v
+ * @returns {boolean|undefined}
+ */
+function parseDatasetBool(v) {
+	if (v == null) { return; }
+	const s = String(v).trim().toLowerCase();
+	if (s === "" || s === "true" || s === "1" || s === "yes" || s === "on") { return true; }
+	if (s === "false" || s === "0" || s === "no" || s === "off") { return false; }
+	return;
+}
+
+/**
+ * datasetのnumber値を解釈する（整数想定）
+ * - 未指定/空なら undefined
+ * - 数値でなければ undefined
+ * @param {string|undefined} v
+ * @returns {number|undefined}
+ */
+function parseDatasetNumber(v) {
+	if (v == null) { return; }
+	const s = String(v).trim();
+	if (s === "") { return; }
+	const n = Number(s);
+	return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * enumを解釈する（未指定なら undefined）
+ * @template {string} T
+ * @param {string|undefined} v
+ * @param {readonly T[]} allowed
+ * @returns {T|undefined}
+ */
+function parseDatasetEnum(v, allowed) {
+	if (v == null) { return; }
+	const s = String(v).trim();
+	if (s === "") { return; }
+	// 大文字小文字を区別したいならここを変える（今は厳密一致）
+	return /** @type {T|undefined} */ (allowed.includes(/** @type {any} */ (s)) ? s : undefined);
+}
+
+/**
+ * The script is part of TextInputGuard.
+ *
+ * AUTHOR:
+ *  natade-jp (https://github.com/natade-jp)
+ *
+ * LICENSE:
+ *  The MIT license https://opensource.org/licenses/MIT
+ */
+
+
+/**
  * @typedef {GuardGroup} GuardGroup
  * @typedef {Guard} Guard
  * @typedef {AttachOptions} AttachOptions
@@ -1127,19 +1184,6 @@ class InputGuard {
  * @property {string} name
  * @property {(dataset: DOMStringMap, el: HTMLInputElement|HTMLTextAreaElement) => Rule|null} fromDataset
  */
-
-/**
- * Boolean系のdata値を解釈する（未指定なら undefined を返す）
- * @param {string|undefined} v
- * @returns {boolean|undefined}
- */
-function parseBool(v) {
-	if (v == null) { return; }
-	const s = String(v).trim().toLowerCase();
-	if (s === "" || s === "true" || s === "1" || s === "yes" || s === "on") { return true; }
-	if (s === "false" || s === "0" || s === "no" || s === "off") { return false; }
-	return;
-}
 
 /**
  * separate mode を解釈する（未指定は "auto"）
@@ -1244,7 +1288,7 @@ class InputGuardAutoAttach {
 			const options = {};
 
 			// warn / invalidClass
-			const warn = parseBool(ds.tigWarn);
+			const warn = parseDatasetBool(ds.tigWarn);
 			if (warn != null) { options.warn = warn; }
 
 			if (ds.tigInvalidClass != null && String(ds.tigInvalidClass).trim() !== "") {
@@ -1264,7 +1308,7 @@ class InputGuardAutoAttach {
 				} catch (e) {
 					const w = options.warn ?? true;
 					if (w) {
-						console.warn(`[jp-input-guard] autoAttach: rule "${fac.name}" fromDataset() threw an error.`, e);
+						console.warn(`[text-input-guard] autoAttach: rule "${fac.name}" fromDataset() threw an error.`, e);
 					}
 				}
 			}
@@ -1288,62 +1332,6 @@ class InputGuardAutoAttach {
 			getGuards: () => guards
 		};
 	}
-}
-
-/**
- * The script is part of TextInputGuard.
- *
- * AUTHOR:
- *  natade-jp (https://github.com/natade-jp)
- *
- * LICENSE:
- *  The MIT license https://opensource.org/licenses/MIT
- */
-
-/**
- * datasetのboolean値を解釈する
- * - 未指定なら undefined
- * - "" / "true" / "1" / "yes" / "on" は true
- * - "false" / "0" / "no" / "off" は false
- * @param {string|undefined} v
- * @returns {boolean|undefined}
- */
-function parseDatasetBool(v) {
-	if (v == null) { return; }
-	const s = String(v).trim().toLowerCase();
-	if (s === "" || s === "true" || s === "1" || s === "yes" || s === "on") { return true; }
-	if (s === "false" || s === "0" || s === "no" || s === "off") { return false; }
-	return;
-}
-
-/**
- * datasetのnumber値を解釈する（整数想定）
- * - 未指定/空なら undefined
- * - 数値でなければ undefined
- * @param {string|undefined} v
- * @returns {number|undefined}
- */
-function parseDatasetNumber(v) {
-	if (v == null) { return; }
-	const s = String(v).trim();
-	if (s === "") { return; }
-	const n = Number(s);
-	return Number.isFinite(n) ? n : undefined;
-}
-
-/**
- * enumを解釈する（未指定なら undefined）
- * @template {string} T
- * @param {string|undefined} v
- * @param {readonly T[]} allowed
- * @returns {T|undefined}
- */
-function parseDatasetEnum(v, allowed) {
-	if (v == null) { return; }
-	const s = String(v).trim();
-	if (s === "") { return; }
-	// 大文字小文字を区別したいならここを変える（今は厳密一致）
-	return /** @type {T|undefined} */ (allowed.includes(/** @type {any} */ (s)) ? s : undefined);
 }
 
 /**
@@ -2036,6 +2024,11 @@ function comma() {
 
 		/**
 		 * 表示整形（確定時のみ）
+		 *
+		 * 前提:
+		 * - numeric / digits 等で正規化済みの数値文字列が渡される
+		 * - 整数部・小数部・符号のみを含む（カンマは含まない想定）
+		 *
 		 * @param {string} value
 		 * @returns {string}
 		 */

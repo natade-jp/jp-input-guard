@@ -1,4 +1,4 @@
-# JP Input Guard – Rule Design Guide
+# TextInputGuard – Rule Design Guide
 
 このドキュメントはルール作成者向けのガイドです。
 

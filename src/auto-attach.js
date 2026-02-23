@@ -8,6 +8,8 @@
  *  The MIT license https://opensource.org/licenses/MIT
  */
 
+import { parseDatasetBool } from "./rules/_dataset.js";
+
 /**
  * @typedef {import("./text-input-guard.js").GuardGroup} GuardGroup
  * @typedef {import("./text-input-guard.js").Guard} Guard
@@ -21,19 +23,6 @@
  * @property {string} name
  * @property {(dataset: DOMStringMap, el: HTMLInputElement|HTMLTextAreaElement) => Rule|null} fromDataset
  */
-
-/**
- * Boolean系のdata値を解釈する（未指定なら undefined を返す）
- * @param {string|undefined} v
- * @returns {boolean|undefined}
- */
-function parseBool(v) {
-	if (v == null) { return; }
-	const s = String(v).trim().toLowerCase();
-	if (s === "" || s === "true" || s === "1" || s === "yes" || s === "on") { return true; }
-	if (s === "false" || s === "0" || s === "no" || s === "off") { return false; }
-	return;
-}
 
 /**
  * separate mode を解釈する（未指定は "auto"）
@@ -138,7 +127,7 @@ export class InputGuardAutoAttach {
 			const options = {};
 
 			// warn / invalidClass
-			const warn = parseBool(ds.tigWarn);
+			const warn = parseDatasetBool(ds.tigWarn);
 			if (warn != null) { options.warn = warn; }
 
 			if (ds.tigInvalidClass != null && String(ds.tigInvalidClass).trim() !== "") {

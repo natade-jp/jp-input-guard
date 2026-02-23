@@ -1,6 +1,6 @@
-# JP Input Guard – Concept
+# TextInputGuard – Concept
 
-JP Input Guard は「入力中の体験」と「確定時のデータ整合性」を分離することを目的とした入力制御ライブラリです。
+TextInputGuard は「入力中の体験」と「確定時のデータ整合性」を分離することを目的とした入力制御ライブラリです。
 
 単なる入力制限ではなく、以下の思想に基づいて設計されています。
 
@@ -32,7 +32,7 @@ JP Input Guard は「入力中の体験」と「確定時のデータ整合性�
 
 ## フェーズ分離設計
 
-JP Input Guard では処理を5つのフェーズに分けています。
+TextInputGuard では処理を5つのフェーズに分けています。
 
 1. `normalizeChar`
 2. `normalizeStructure`
@@ -50,7 +50,7 @@ JP Input Guard では処理を5つのフェーズに分けています。
 
 ## エラーと入力ブロックの分離
 
-JP Input Guard では以下を明確に分けています。
+TextInputGuard では以下を明確に分けています。
 
 ### `ctx.pushError()`
 
@@ -100,5 +100,5 @@ IME入力を破壊しない設計を採用しています。
 - ルール責務を明確に分離する
 - 将来的な拡張に耐える
 
-JP Input Guard は単なる入力制限ではなく、
+TextInputGuard は単なる入力制限ではなく、
 「入力フロー設計ライブラリ」です。

@@ -16,7 +16,7 @@ import { InputGuardAutoAttach } from "./auto-attach.js";
 // rules
 import { numeric } from "./rules/numeric.js";
 import { digits } from "./rules/digits.js";
-import { comma } from "./rules/formatComma.js";
+import { comma } from "./rules/comma.js";
 
 // ---- individual exports (ESM/CJS) ----
 export { attach, attachAll };
