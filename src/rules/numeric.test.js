@@ -19,6 +19,19 @@ test("normalizeChar: allowFullWidth=false だと全角数字は除去される",
 	assert.equal(rule.normalizeChar("１２３"), "");
 });
 
+test("normalizeChar: allowFullWidth=false でも半角は残り、全角記号は落ちる", () => {
+	const rule = numeric({ allowFullWidth: false, allowMinus: true, allowDecimal: true });
+	// 全角数字・全角ドット・全角マイナスは落ちる
+	assert.equal(rule.normalizeChar("－１２３．４"), "");
+	// 半角は残る
+	assert.equal(rule.normalizeChar("-123.4"), "-123.4");
+});
+
+test("normalizeChar: 空白や文字は除去される（数字だけ残る）", () => {
+	const rule = numeric({ allowFullWidth: true, allowMinus: true, allowDecimal: true });
+	assert.equal(rule.normalizeChar(" 1 2 a b 3 "), "123");
+});
+
 test("normalizeChar: allowDecimal=false だと '.' や全角ドット類は除去される", () => {
 	const rule = numeric({ allowDecimal: false, allowFullWidth: true });
 	assert.equal(rule.normalizeChar("1.2"), "12");
@@ -77,6 +90,20 @@ test("normalizeStructure: allowDecimal=true なら '.' は1回だけ残る（位
 	assert.equal(rule.normalizeStructure("-.1.2"), "-.12");
 });
 
+test("normalizeStructure: allowMinus=false のとき '-' は全て落ちる", () => {
+	const rule = numeric({ allowMinus: false, allowDecimal: true });
+	assert.equal(rule.normalizeStructure("-12"), "12");
+	assert.equal(rule.normalizeStructure("--12"), "12");
+	assert.equal(rule.normalizeStructure("1-2"), "12");
+});
+
+test("normalizeStructure: allowDecimal=false のとき '.' は全て落ちる", () => {
+	const rule = numeric({ allowMinus: true, allowDecimal: false });
+	assert.equal(rule.normalizeStructure("1.2"), "12");
+	assert.equal(rule.normalizeStructure(".1"), "1");
+	assert.equal(rule.normalizeStructure("-.1"), "-1");
+});
+
 test("fix: 未完成な数値 '-', '.', '-.' は空になる", () => {
 	const rule = numeric({ allowMinus: true, allowDecimal: true });
 	assert.equal(rule.fix("-"), "");
@@ -111,6 +138,28 @@ test("fix: '-0' や '-0.0' は '0' になる（負のゼロ除去）", () => {
 	assert.equal(rule.fix("-00"), "0");
 	assert.equal(rule.fix("-0.0"), "0.0");
 	assert.equal(rule.fix("-000.000"), "0.000");
+});
+
+test("fix: allowEmpty=false だと空文字は '0' になる", () => {
+	const rule = numeric({ allowEmpty: false, allowMinus: true, allowDecimal: true });
+	assert.equal(rule.fix(""), "0");
+});
+
+test("fix: allowEmpty=false だと '-', '.', '-.' も '0' になる", () => {
+	const rule = numeric({ allowEmpty: false, allowMinus: true, allowDecimal: true });
+	assert.equal(rule.fix("-"), "0");
+	assert.equal(rule.fix("."), "0");
+	assert.equal(rule.fix("-."), "0");
+});
+
+test("fix: '000.000' は '0.000' になる（整数部のみゼロ正規化）", () => {
+	const rule = numeric({ allowMinus: true, allowDecimal: true });
+	assert.equal(rule.fix("000.000"), "0.000");
+});
+
+test("fix: '-000.010' は '-0.010' になる（負のゼロではないので符号維持）", () => {
+	const rule = numeric({ allowMinus: true, allowDecimal: true });
+	assert.equal(rule.fix("-000.010"), "-0.010");
 });
 
 test("validate: numeric単体は no-op（エラーなどを出さない）", () => {
@@ -148,4 +197,28 @@ test("fromDataset: dataset のオプションが反映される（normalizeChar/
 	assert.equal(rule.normalizeStructure("--1..2"), "-1.2");
 	// fix で整形
 	assert.equal(rule.fix("-.1"), "-0.1");
+});
+
+test("fromDataset: allowEmpty が反映される（false なら空→0）", () => {
+	const dataset = {
+		tigRulesNumeric: "1",
+		tigRulesNumericAllowEmpty: "false",
+		tigRulesNumericAllowMinus: "true",
+		tigRulesNumericAllowDecimal: "true"
+	};
+
+	const rule = numeric.fromDataset(dataset, /** @type {any} */ (null));
+	assert.ok(rule);
+	assert.equal(rule.fix(""), "0");
+	assert.equal(rule.fix("-"), "0");
+});
+
+test("fromDataset: allowEmpty 未指定ならデフォルト true（空は空のまま）", () => {
+	const dataset = {
+		tigRulesNumeric: "1"
+	};
+
+	const rule = numeric.fromDataset(dataset, /** @type {any} */ (null));
+	assert.ok(rule);
+	assert.equal(rule.fix(""), "");
 });

@@ -20,6 +20,7 @@ import { parseDatasetBool, parseDatasetNumber, parseDatasetEnum } from "./_datas
  * @property {"none"|"truncate"|"round"} [fixFracOnBlur="none"] - blur時の小数部補正
  * @property {"none"|"block"} [overflowInputInt="none"] - 入力中：整数部が最大桁を超える入力をブロックする
  * @property {"none"|"block"} [overflowInputFrac="none"] - 入力中：小数部が最大桁を超える入力をブロックする
+ * @property {boolean} [forceFracOnBlur=false] - blur時に小数部を必ず表示（frac桁まで0埋め）
  */
 
 /**
@@ -160,7 +161,8 @@ export function digits(options = {}) {
 		fixIntOnBlur: options.fixIntOnBlur ?? "none",
 		fixFracOnBlur: options.fixFracOnBlur ?? "none",
 		overflowInputInt: options.overflowInputInt ?? "none",
-		overflowInputFrac: options.overflowInputFrac ?? "none"
+		overflowInputFrac: options.overflowInputFrac ?? "none",
+		forceFracOnBlur: options.forceFracOnBlur ?? false
 	};
 
 	return {
@@ -277,14 +279,39 @@ export function digits(options = {}) {
 				}
 			}
 
-			// 組み立て（frac=0 のときは "." を残すか？は方針次第だが、ここでは消す）
-			if (!hasDot || typeof opt.frac !== "number") {
+			if (opt.forceFracOnBlur && typeof opt.frac === "number" && opt.frac > 0) {
+				const limit = opt.frac;
+				// "." が無いなら作る（12 → 12.00）
+				if (!hasDot) {
+					fracPart = "";
+				}
+				// 足りない分を 0 埋め（12.3 → 12.30 / 12. → 12.00）
+				const f = fracPart ?? "";
+				if (f.length < limit) {
+					fracPart = f + "0".repeat(limit - f.length);
+				}
+			}
+
+			// 組み立て
+			if (typeof opt.frac !== "number") {
+				// frac未指定なら、dot があっても digits は触らず intだけ返す方針（現状維持）
 				return `${sign}${intPart}`;
 			}
+
 			if (opt.frac === 0) {
+				// 小数0桁なら常に整数表示
 				return `${sign}${intPart}`;
 			}
-			return `${sign}${intPart}.${fracPart}`;
+
+			// frac 指定あり（1以上）
+			if (hasDot || (opt.forceFracOnBlur && opt.frac > 0)) {
+				// "." が無いけど forceFracOnBlur の場合もここに来る
+				const f = fracPart ?? "";
+				return `${sign}${intPart}.${f}`;
+			}
+
+			// "." が無くて force もしないなら整数表示
+			return `${sign}${intPart}`;
 		}
 	};
 }
@@ -303,6 +330,7 @@ export function digits(options = {}) {
  * - data-tig-rules-digits-fix-frac-on-blur         -> dataset.tigRulesDigitsFixFracOnBlur
  * - data-tig-rules-digits-overflow-input-int       -> dataset.tigRulesDigitsOverflowInputInt
  * - data-tig-rules-digits-overflow-input-frac      -> dataset.tigRulesDigitsOverflowInputFrac
+ * - data-tig-rules-digits-force-frac-on-blur       -> dataset.tigRulesDigitsForceFracOnBlur
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
@@ -363,6 +391,12 @@ digits.fromDataset = function fromDataset(dataset, _el) {
 	const ovFrac = parseDatasetEnum(dataset.tigRulesDigitsOverflowInputFrac, ["none", "block"]);
 	if (ovFrac != null) {
 		options.overflowInputFrac = ovFrac;
+	}
+
+	// forceFracOnBlur
+	const forceFrac = parseDatasetBool(dataset.tigRulesDigitsForceFracOnBlur);
+	if (forceFrac != null) {
+		options.forceFracOnBlur = forceFrac;
 	}
 
 	return digits(options);

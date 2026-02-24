@@ -1,4 +1,4 @@
-# TextInputGuard – Rule Design Guide
+# Rule Design Guide
 
 このドキュメントはルール作成者向けのガイドです。
 

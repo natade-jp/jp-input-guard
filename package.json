@@ -35,6 +35,10 @@
 	"scripts": {
 		"build": "node ./scripts/package.build.js",
 		"test": "node --test \"src/**/*.test.js\"",
+		"doc": "node ./scripts/package.doc.js",
+		"docs:dev": "vitepress dev docs",
+		"docs:build": "vitepress build docs",
+		"docs:preview": "vitepress preview docs",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
 		"format": "prettier . --write",
@@ -63,6 +67,7 @@
 		"prettier": "^3.8.1",
 		"rollup": "^4.56.0",
 		"rollup-plugin-dts": "^6.3.0",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitepress": "^1.6.4"
 	}
 }

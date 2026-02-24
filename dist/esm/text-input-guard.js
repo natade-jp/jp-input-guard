@@ -1351,6 +1351,7 @@ class InputGuardAutoAttach {
  * @property {boolean} [allowFullWidth=true] - 全角数字/記号を許可して半角へ正規化する
  * @property {boolean} [allowMinus=false] - マイナス記号を許可する（先頭のみ）
  * @property {boolean} [allowDecimal=false] - 小数点を許可する（1つだけ）
+ * @property {boolean} [allowEmpty=true] - 空文字を許可するか
  */
 
 /**
@@ -1366,7 +1367,8 @@ function numeric(options = {}) {
 	const opt = {
 		allowFullWidth: options.allowFullWidth ?? true,
 		allowMinus: options.allowMinus ?? false,
-		allowDecimal: options.allowDecimal ?? false
+		allowDecimal: options.allowDecimal ?? false,
+		allowEmpty: options.allowEmpty ?? true
 	};
 
 	/** @type {Set<string>} */
@@ -1524,9 +1526,14 @@ function numeric(options = {}) {
 		fix(value) {
 			let v = String(value);
 
+			// 空文字の扱い
+			if (v === "") {
+				return opt.allowEmpty ? "" : "0";
+			}
+
 			// 未完成な数値は空にする
 			if (v === "-" || v === "." || v === "-.") {
-				return "";
+				return opt.allowEmpty ? "" : "0";
 			}
 
 			// "-.1" → "-0.1"
@@ -1598,6 +1605,7 @@ function numeric(options = {}) {
  * - data-tig-rules-numeric-allow-full-width      -> dataset.tigRulesNumericAllowFullWidth
  * - data-tig-rules-numeric-allow-minus           -> dataset.tigRulesNumericAllowMinus
  * - data-tig-rules-numeric-allow-decimal         -> dataset.tigRulesNumericAllowDecimal
+ * - data-tig-rules-numeric-allow-empty           -> dataset.tigRulesNumericAllowEmpty
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
@@ -1630,6 +1638,12 @@ numeric.fromDataset = function fromDataset(dataset, _el) {
 		options.allowDecimal = allowDecimal;
 	}
 
+	// data-tig-rules-numeric-allow-empty（未指定なら numeric側デフォルト true）
+	const allowEmpty = parseDatasetBool(dataset.tigRulesNumericAllowEmpty);
+	if (allowEmpty != null) {
+		options.allowEmpty = allowEmpty;
+	}
+
 	return numeric(options);
 };
 
@@ -1654,6 +1668,7 @@ numeric.fromDataset = function fromDataset(dataset, _el) {
  * @property {"none"|"truncate"|"round"} [fixFracOnBlur="none"] - blur時の小数部補正
  * @property {"none"|"block"} [overflowInputInt="none"] - 入力中：整数部が最大桁を超える入力をブロックする
  * @property {"none"|"block"} [overflowInputFrac="none"] - 入力中：小数部が最大桁を超える入力をブロックする
+ * @property {boolean} [forceFracOnBlur=false] - blur時に小数部を必ず表示（frac桁まで0埋め）
  */
 
 /**
@@ -1794,7 +1809,8 @@ function digits(options = {}) {
 		fixIntOnBlur: options.fixIntOnBlur ?? "none",
 		fixFracOnBlur: options.fixFracOnBlur ?? "none",
 		overflowInputInt: options.overflowInputInt ?? "none",
-		overflowInputFrac: options.overflowInputFrac ?? "none"
+		overflowInputFrac: options.overflowInputFrac ?? "none",
+		forceFracOnBlur: options.forceFracOnBlur ?? false
 	};
 
 	return {
@@ -1911,14 +1927,39 @@ function digits(options = {}) {
 				}
 			}
 
-			// 組み立て（frac=0 のときは "." を残すか？は方針次第だが、ここでは消す）
-			if (!hasDot || typeof opt.frac !== "number") {
+			if (opt.forceFracOnBlur && typeof opt.frac === "number" && opt.frac > 0) {
+				const limit = opt.frac;
+				// "." が無いなら作る（12 → 12.00）
+				if (!hasDot) {
+					fracPart = "";
+				}
+				// 足りない分を 0 埋め（12.3 → 12.30 / 12. → 12.00）
+				const f = fracPart ?? "";
+				if (f.length < limit) {
+					fracPart = f + "0".repeat(limit - f.length);
+				}
+			}
+
+			// 組み立て
+			if (typeof opt.frac !== "number") {
+				// frac未指定なら、dot があっても digits は触らず intだけ返す方針（現状維持）
 				return `${sign}${intPart}`;
 			}
+
 			if (opt.frac === 0) {
+				// 小数0桁なら常に整数表示
 				return `${sign}${intPart}`;
 			}
-			return `${sign}${intPart}.${fracPart}`;
+
+			// frac 指定あり（1以上）
+			if (hasDot || (opt.forceFracOnBlur && opt.frac > 0)) {
+				// "." が無いけど forceFracOnBlur の場合もここに来る
+				const f = fracPart ?? "";
+				return `${sign}${intPart}.${f}`;
+			}
+
+			// "." が無くて force もしないなら整数表示
+			return `${sign}${intPart}`;
 		}
 	};
 }
@@ -1937,6 +1978,7 @@ function digits(options = {}) {
  * - data-tig-rules-digits-fix-frac-on-blur         -> dataset.tigRulesDigitsFixFracOnBlur
  * - data-tig-rules-digits-overflow-input-int       -> dataset.tigRulesDigitsOverflowInputInt
  * - data-tig-rules-digits-overflow-input-frac      -> dataset.tigRulesDigitsOverflowInputFrac
+ * - data-tig-rules-digits-force-frac-on-blur       -> dataset.tigRulesDigitsForceFracOnBlur
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
@@ -1997,6 +2039,12 @@ digits.fromDataset = function fromDataset(dataset, _el) {
 	const ovFrac = parseDatasetEnum(dataset.tigRulesDigitsOverflowInputFrac, ["none", "block"]);
 	if (ovFrac != null) {
 		options.overflowInputFrac = ovFrac;
+	}
+
+	// forceFracOnBlur
+	const forceFrac = parseDatasetBool(dataset.tigRulesDigitsForceFracOnBlur);
+	if (forceFrac != null) {
+		options.forceFracOnBlur = forceFrac;
 	}
 
 	return digits(options);

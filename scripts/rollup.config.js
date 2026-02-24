@@ -136,9 +136,31 @@ data.push(
 		banner,
 		globalName,
 		input,
+		outputFile: `./dist/cjs/${packageName}.min.cjs`,
+		format: "cjs",
+		isUglify: true
+	})
+);
+
+data.push(
+	createData({
+		banner,
+		globalName,
+		input,
 		outputFile: `./dist/esm/${packageName}.js`,
 		format: "esm",
 		isUglify: false
+	})
+);
+
+data.push(
+	createData({
+		banner,
+		globalName,
+		input,
+		outputFile: `./dist/esm/${packageName}.min.js`,
+		format: "esm",
+		isUglify: true
 	})
 );
 

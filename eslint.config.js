@@ -17,8 +17,7 @@ export default [
 			"**/dist/**",
 			"**/out/**",
 			"**/html/**",
-			"**/docs/**",
-
+			//	"**/docs/**",
 			"**/*.md",
 			"package-lock.json"
 		]
@@ -56,7 +55,7 @@ export default [
 
 	// ---- JS ----
 	{
-		files: ["**/*.js"],
+		files: ["**/*.js", "**/*.mjs"],
 		languageOptions: {
 			ecmaVersion: 2022,
 			sourceType: "module",

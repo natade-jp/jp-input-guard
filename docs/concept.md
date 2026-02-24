@@ -1,4 +1,4 @@
-# TextInputGuard – Concept
+# Concept
 
 TextInputGuard は「入力中の体験」と「確定時のデータ整合性」を分離することを目的とした入力制御ライブラリです。
 
