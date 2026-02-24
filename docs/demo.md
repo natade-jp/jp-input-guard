@@ -8,7 +8,7 @@
 制限を超えた場合の入力不可は行わず、エラーとする。
 
 <iframe
-  src="/demo/attach-test1.html"
+  :src="$withBase('/demo/attach-test1.html')"
   style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
@@ -39,7 +39,7 @@ attach(input, {
 制限を超えた場合、入力できないようにする。
 
 <iframe
-  src="/demo/attach-test2.html"
+  :src="$withBase('/demo/attach-test2.html')"
   style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
@@ -70,7 +70,7 @@ const guard = attach(input, {
 空は不許可かつ、必ず小数点を付ける。
 
 <iframe
-  src="/demo/attach-test3.html"
+  :src="$withBase('/demo/attach-test3.html')"
   style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
@@ -102,7 +102,7 @@ const guard = attach(input, {
 `querySelectorAll` で複数の入力項目を同一設定で変更する。
 
 <iframe
-  src="/demo/attach-all.html"
+  :src="$withBase('/demo/attach-all.html')"
   style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
@@ -123,7 +123,7 @@ const guard = guards.getGuards()[0];
 `autoAttach` で `input` 内の `data` 要素から自動設定。
 
 <iframe
-  src="/demo/attach-all.html"
+  :src="$withBase('/demo/auto-attach.html')"
   style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
