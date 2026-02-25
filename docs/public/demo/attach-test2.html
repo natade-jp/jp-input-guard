@@ -61,7 +61,7 @@
 			const el = guard.getDisplayElement();
 
 			function renderState() {
-				output.textContent = `display value : ${el.value}
+				output.textContent = `display value : ${guard.getDisplayValue()}
 raw value     : ${guard.getRawValue()}
 isValid       : ${guard.isValid()}
 errors        : ${JSON.stringify(guard.getErrors(), null, 2)}`;

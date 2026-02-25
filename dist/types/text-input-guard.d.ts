@@ -87,7 +87,15 @@ type Guard = {
      */
     getRawValue: () => string;
     /**
-     * - ユーザーが実際に操作している要素（swap時はdisplay側）
+     * - ユーザーが実際に操作している要素の値を取得
+     */
+    getDisplayValue: () => string;
+    /**
+     * - 送信用の正規化済み値の要素
+     */
+    getRawElement: () => HTMLInputElement | HTMLTextAreaElement;
+    /**
+     * - ユーザーが実際に操作している要素（swap時はdisplay専用）
      */
     getDisplayElement: () => HTMLInputElement | HTMLTextAreaElement;
 };
@@ -200,32 +208,6 @@ type AttachOptions = {
     separateValue?: SeparateValueOptions;
 };
 /**
- * swap時に退避する元inputの情報
- * detach時に元の状態へ復元するために使用する
- */
-type SwapState = {
-    /**
-     * - 元のinput.type
-     */
-    originalType: string;
-    /**
-     * - 元のid属性
-     */
-    originalId: string | null;
-    /**
-     * - 元のname属性
-     */
-    originalName: string | null;
-    /**
-     * - 元のclass文字列
-     */
-    originalClass: string;
-    /**
-     * - 生成した表示用input
-     */
-    createdDisplay: HTMLInputElement;
-};
-/**
  * selection（カーソル/選択範囲）の退避情報
  */
 type SelectionState = {
@@ -257,4 +239,4 @@ type RevertRequest = {
 };
 
 export { attach, attachAll };
-export type { AttachOptions, ElementKind, Guard, GuardContext, GuardGroup, PhaseName, RevertRequest, Rule, SelectionState, SeparateValueOptions, SwapState, TigError };
+export type { AttachOptions, ElementKind, Guard, GuardContext, GuardGroup, PhaseName, RevertRequest, Rule, SelectionState, SeparateValueOptions, TigError };

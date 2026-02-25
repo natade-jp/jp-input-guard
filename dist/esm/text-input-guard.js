@@ -1,4 +1,247 @@
 /**
+ * The script is part of TextInputGuard.
+ *
+ * AUTHOR:
+ *  natade-jp (https://github.com/natade-jp)
+ *
+ * LICENSE:
+ *  The MIT license https://opensource.org/licenses/MIT
+ */
+
+/**
+ * SwapState
+ *
+ * separateValue.mode="swap" のときに使用する
+ * 元 input 要素の状態スナップショットおよび復元ロジックを管理するクラス
+ *
+ * 役割
+ *  - swap前の input の属性状態を保持する
+ *  - raw化および display生成時に必要な属性を適用する
+ *  - detach時に元の状態へ復元する
+ *
+ * 設計方針
+ *  - 送信用属性は raw に残す
+ *  - UIおよびアクセシビリティ属性は display に適用する
+ *  - tig内部用の data-* は display にコピーしない
+ */
+class SwapState {
+	/**
+	 * 元 input の type 属性
+	 * detach時に復元するため保持する
+	 * @type {string}
+	 */
+	originalType;
+
+	/**
+	 * 元 input の id 属性
+	 * swap時に display へ移し detach時に rawへ戻す
+	 * @type {string|null}
+	 */
+	originalId;
+
+	/**
+	 * 元 input の name 属性
+	 * 送信用属性のため raw側に残すが
+	 * detach時の整合性のため保持する
+	 * @type {string|null}
+	 */
+	originalName;
+
+	/**
+	 * 元 input の class 属性
+	 * swap時に display へ移す
+	 * @type {string}
+	 */
+	originalClass;
+
+	/**
+	 * UI系属性のスナップショット
+	 * placeholder inputmode required などを保持する
+	 *
+	 * key 属性名
+	 * value 属性値 未指定の場合は null
+	 *
+	 * @type {Object.<string, string|null>}
+	 */
+	originalUiAttrs;
+
+	/**
+	 * aria-* 属性のスナップショット
+	 * アクセシビリティ維持のため display に適用する
+	 *
+	 * key aria属性名 例 aria-label
+	 * value 属性値
+	 *
+	 * @type {Object.<string, string>}
+	 */
+	originalAriaAttrs;
+
+	/**
+	 * tig 以外の data-* 属性のスナップショット
+	 * swap後も display へ引き継ぐ
+	 *
+	 * key datasetキー camelCase
+	 * value 属性値
+	 *
+	 * @type {Object.<string, string>}
+	 */
+	originalDataset;
+
+	/**
+	 * swap時に生成された display 用 input 要素
+	 * detach時に削除するため保持する
+	 *
+	 * @type {HTMLInputElement|null}
+	 */
+	createdDisplay;
+
+	/**
+	 * @param {HTMLInputElement} input
+	 * swap前の元 input 要素
+	 */
+	constructor(input) {
+		this.originalType = input.type;
+		this.originalId = input.getAttribute("id");
+		this.originalName = input.getAttribute("name");
+		this.originalClass = input.className;
+
+		this.originalUiAttrs = {};
+		this.originalAriaAttrs = {};
+		this.originalDataset = {};
+		this.createdDisplay = null;
+
+		const UI_ATTRS = [
+			"placeholder",
+			"inputmode",
+			"autocomplete",
+			"required",
+			"minlength",
+			"maxlength",
+			"pattern",
+			"title",
+			"tabindex"
+		];
+
+		for (const name of UI_ATTRS) {
+			this.originalUiAttrs[name] =
+				input.hasAttribute(name) ? input.getAttribute(name) : null;
+		}
+
+		for (const attr of input.attributes) {
+			if (attr.name.startsWith("aria-")) {
+				this.originalAriaAttrs[attr.name] = attr.value ?? "";
+			}
+		}
+
+		for (const [k, v] of Object.entries(input.dataset)) {
+			if (k.startsWith("tig")) { continue; }
+			this.originalDataset[k] = v;
+		}
+	}
+
+	/**
+	 * raw 元input を hidden 化する
+	 * 送信担当要素として扱う
+	 *
+	 * @param {HTMLInputElement} input
+	 * @returns {void}
+	 */
+	applyToRaw(input) {
+		// raw化（送信担当）
+		input.type = "hidden";
+		input.removeAttribute("id");
+		input.className = "";
+		input.dataset.tigRole = "raw";
+
+		// 元idのメタを残す（デバッグ/参照用）
+		if (this.originalId) {
+			input.dataset.tigOriginalId = this.originalId;
+		}
+		if (this.originalName) {
+			input.dataset.tigOriginalName = this.originalName;
+		}
+	}
+
+	/**
+	 * display用 input を生成し UI属性 aria属性 data属性を適用
+	 *
+	 * @param {HTMLInputElement} raw hidden化された元input
+	 * @returns {HTMLInputElement}
+	 */
+	createDisplay(raw) {
+		const display = document.createElement("input");
+		display.type = "text";
+		display.dataset.tigRole = "display";
+
+		if (this.originalId) {
+			display.id = this.originalId;
+		}
+
+		display.className = this.originalClass ?? "";
+		display.value = raw.value;
+
+		for (const [name, v] of Object.entries(this.originalUiAttrs)) {
+			if (v == null) {
+				display.removeAttribute(name);
+			} else {
+				display.setAttribute(name, v);
+			}
+		}
+
+		for (const [name, v] of Object.entries(this.originalAriaAttrs)) {
+			display.setAttribute(name, v);
+		}
+
+		for (const [k, v] of Object.entries(this.originalDataset)) {
+			display.dataset[k] = v;
+		}
+
+		this.createdDisplay = display;
+		return display;
+	}
+
+	/**
+	 * detach時に display 要素を削除する
+	 *
+	 * @returns {void}
+	 */
+	removeDisplay() {
+		if (this.createdDisplay?.parentNode) {
+			this.createdDisplay.parentNode.removeChild(this.createdDisplay);
+		}
+		this.createdDisplay = null;
+	}
+
+	/**
+	 * raw hidden化された元input を元の状態へ復元する
+	 *
+	 * @param {HTMLInputElement} raw
+	 * @returns {void}
+	 */
+	restoreRaw(raw) {
+		raw.type = this.originalType;
+
+		if (this.originalId) {
+			raw.setAttribute("id", this.originalId);
+		} else {
+			raw.removeAttribute("id");
+		}
+
+		if (this.originalName) {
+			raw.setAttribute("name", this.originalName);
+		} else {
+			raw.removeAttribute("name");
+		}
+
+		raw.className = this.originalClass ?? "";
+
+		delete raw.dataset.tigRole;
+		delete raw.dataset.tigOriginalId;
+		delete raw.dataset.tigOriginalName;
+	}
+}
+
+/**
  * The script is part of JPInputGuard.
  *
  * AUTHOR:
@@ -7,6 +250,7 @@
  * LICENSE:
  *  The MIT license https://opensource.org/licenses/MIT
  */
+
 
 /**
  * 対象要素の種別（現在は input と textarea のみ対応）
@@ -35,7 +279,9 @@
  * @property {() => boolean} isValid - 現在エラーが無いかどうか
  * @property {() => TigError[]} getErrors - エラー一覧を取得
  * @property {() => string} getRawValue - 送信用の正規化済み値を取得
- * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay側）
+ * @property {() => string} getDisplayValue - ユーザーが実際に操作している要素の値を取得
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getRawElement - 送信用の正規化済み値の要素
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay専用）
  */
 
 /**
@@ -82,17 +328,6 @@
  * @property {boolean} [warn] - 非対応ルールなどを console.warn するか
  * @property {string} [invalidClass] - エラー時に付けるclass名
  * @property {SeparateValueOptions} [separateValue] - 表示値と内部値の分離設定
- */
-
-/**
- * swap時に退避する元inputの情報
- * detach時に元の状態へ復元するために使用する
- * @typedef {Object} SwapState
- * @property {string} originalType - 元のinput.type
- * @property {string|null} originalId - 元のid属性
- * @property {string|null} originalName - 元のname属性
- * @property {string} originalClass - 元のclass文字列
- * @property {HTMLInputElement} createdDisplay - 生成した表示用input
  */
 
 /**
@@ -438,60 +673,18 @@ class InputGuard {
 
 		const input = /** @type {HTMLInputElement} */ (this.originalElement);
 
-		// 退避（detachで戻すため）
-		/** @type {SwapState} */
-		this.swapState = {
-			originalType: input.type,
-			originalId: input.getAttribute("id"),
-			originalName: input.getAttribute("name"),
-			originalClass: input.className,
-			// 必要になったらここに placeholder/aria/data を追加していく
-			createdDisplay: null
-		};
+		const state = new SwapState(input);
+		state.applyToRaw(input);
 
-		// raw化（送信担当）
-		input.type = "hidden";
-		input.removeAttribute("id"); // displayに引き継ぐため
-		input.dataset.tigRole = "raw";
-
-		// 元idのメタを残す（デバッグ/参照用）
-		if (this.swapState.originalId) {
-			input.dataset.tigOriginalId = this.swapState.originalId;
-		}
-
-		if (this.swapState.originalName) {
-			input.dataset.tigOriginalName = this.swapState.originalName;
-		}
-
-		// display生成（ユーザー入力担当）
-		const display = document.createElement("input");
-		display.type = "text";
-		display.dataset.tigRole = "display";
-
-		// id は display に移す
-		if (this.swapState.originalId) {
-			display.id = this.swapState.originalId;
-		}
-
-		// name は付けない（送信しない）
-		display.removeAttribute("name");
-
-		// class は display に
-		display.className = this.swapState.originalClass;
-		input.className = "";
-
-		// value 初期同期
-		display.value = input.value;
-
-		// DOMに挿入（rawの直後）
+		const display = state.createDisplay(input);
 		input.after(display);
 
-		// elements更新
-		this.hostElement = input;
-		this.displayElement = display;
-		this.rawElement = input;
+		this.swapState = state;
 
-		this.swapState.createdDisplay = display;
+		// elements更新
+		this.hostElement = input;      // raw
+		this.displayElement = display; // display
+		this.rawElement = input;
 
 		// revert 機構
 		this.lastAcceptedValue = display.value;
@@ -512,10 +705,10 @@ class InputGuard {
 
 		// rawは元の input（hidden化されている）
 		const raw = /** @type {HTMLInputElement} */ (this.hostElement);
-		const display = state.createdDisplay;
 
 		// displayが存在するなら、最新表示値をrawに同期してから消す（安全策）
 		// ※ rawは常に正規化済みを持つ設計だけど、念のため
+		const display = state.createdDisplay;
 		if (display) {
 			try {
 				raw.value = raw.value || display.value;
@@ -525,39 +718,18 @@ class InputGuard {
 		}
 
 		// display削除
-		if (display && display.parentNode) {
-			display.parentNode.removeChild(display);
-		}
+		state.removeDisplay();
 
 		// rawを元に戻す（type）
-		raw.type = state.originalType;
-
-		// id を戻す
-		if (state.originalId) {
-			raw.setAttribute("id", state.originalId);
-		} else {
-			raw.removeAttribute("id");
-		}
-
-		// name を戻す（swap中は残している想定だが、念のため）
-		if (state.originalName) {
-			raw.setAttribute("name", state.originalName);
-		} else {
-			raw.removeAttribute("name");
-		}
-
-		// class を戻す
-		raw.className = state.originalClass ?? "";
-
-		// data属性（tig用）は消しておく
-		delete raw.dataset.tigRole;
-		delete raw.dataset.tigOriginalId;
-		delete raw.dataset.tigOriginalName;
+		state.restoreRaw(raw);
 
 		// elements参照を original に戻す
 		this.hostElement = this.originalElement;
 		this.displayElement = this.originalElement;
 		this.rawElement = null;
+
+		// swapState破棄
+		this.swapState = null;
 	}
 
 	/**
@@ -569,8 +741,6 @@ class InputGuard {
 		this.unbindEvents();
 		// swap復元
 		this.restoreSeparateValue();
-		// swapState破棄
-		this.swapState = null;
 		// 以後このインスタンスは利用不能にしてもいいが、今回は明示しない
 	}
 
@@ -1080,9 +1250,14 @@ class InputGuard {
 	 * @returns {string}
 	 */
 	getRawValue() {
-		if (this.rawElement) {
-			return this.rawElement.value;
-		}
+		return /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.hostElement).value;
+	}
+
+	/**
+	 * 表示用の値を返す（displayの値）
+	 * @returns {string}
+	 */
+	getDisplayValue() {
 		return /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement).value;
 	}
 
@@ -1097,6 +1272,8 @@ class InputGuard {
 			isValid: () => this.isValid(),
 			getErrors: () => this.getErrors(),
 			getRawValue: () => this.getRawValue(),
+			getDisplayValue: () => this.getDisplayValue(),
+			getRawElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.hostElement),
 			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement)
 		};
 	}
@@ -2162,10 +2339,10 @@ const rules = {
 
 /**
  * バージョン（ビルド時に置換したいならここを差し替える）
- * 例: rollup replace で ""0.0.1"" を package.json の version に置換
+ * 例: rollup replace で ""0.1.0"" を package.json の version に置換
  */
 // @ts-ignore
 // eslint-disable-next-line no-undef
-const version = "0.0.1" ;
+const version = "0.1.0" ;
 
 export { attach, attachAll, autoAttach, comma, digits, numeric, rules, version };

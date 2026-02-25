@@ -8,6 +8,8 @@
  *  The MIT license https://opensource.org/licenses/MIT
  */
 
+import { SwapState } from "./swap-state.js";
+
 /**
  * 対象要素の種別（現在は input と textarea のみ対応）
  * @typedef {"input"|"textarea"} ElementKind
@@ -35,7 +37,9 @@
  * @property {() => boolean} isValid - 現在エラーが無いかどうか
  * @property {() => TigError[]} getErrors - エラー一覧を取得
  * @property {() => string} getRawValue - 送信用の正規化済み値を取得
- * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay側）
+ * @property {() => string} getDisplayValue - ユーザーが実際に操作している要素の値を取得
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getRawElement - 送信用の正規化済み値の要素
+ * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay専用）
  */
 
 /**
@@ -82,17 +86,6 @@
  * @property {boolean} [warn] - 非対応ルールなどを console.warn するか
  * @property {string} [invalidClass] - エラー時に付けるclass名
  * @property {SeparateValueOptions} [separateValue] - 表示値と内部値の分離設定
- */
-
-/**
- * swap時に退避する元inputの情報
- * detach時に元の状態へ復元するために使用する
- * @typedef {Object} SwapState
- * @property {string} originalType - 元のinput.type
- * @property {string|null} originalId - 元のid属性
- * @property {string|null} originalName - 元のname属性
- * @property {string} originalClass - 元のclass文字列
- * @property {HTMLInputElement} createdDisplay - 生成した表示用input
  */
 
 /**
@@ -438,60 +431,18 @@ class InputGuard {
 
 		const input = /** @type {HTMLInputElement} */ (this.originalElement);
 
-		// 退避（detachで戻すため）
-		/** @type {SwapState} */
-		this.swapState = {
-			originalType: input.type,
-			originalId: input.getAttribute("id"),
-			originalName: input.getAttribute("name"),
-			originalClass: input.className,
-			// 必要になったらここに placeholder/aria/data を追加していく
-			createdDisplay: null
-		};
+		const state = new SwapState(input);
+		state.applyToRaw(input);
 
-		// raw化（送信担当）
-		input.type = "hidden";
-		input.removeAttribute("id"); // displayに引き継ぐため
-		input.dataset.tigRole = "raw";
-
-		// 元idのメタを残す（デバッグ/参照用）
-		if (this.swapState.originalId) {
-			input.dataset.tigOriginalId = this.swapState.originalId;
-		}
-
-		if (this.swapState.originalName) {
-			input.dataset.tigOriginalName = this.swapState.originalName;
-		}
-
-		// display生成（ユーザー入力担当）
-		const display = document.createElement("input");
-		display.type = "text";
-		display.dataset.tigRole = "display";
-
-		// id は display に移す
-		if (this.swapState.originalId) {
-			display.id = this.swapState.originalId;
-		}
-
-		// name は付けない（送信しない）
-		display.removeAttribute("name");
-
-		// class は display に
-		display.className = this.swapState.originalClass;
-		input.className = "";
-
-		// value 初期同期
-		display.value = input.value;
-
-		// DOMに挿入（rawの直後）
+		const display = state.createDisplay(input);
 		input.after(display);
 
-		// elements更新
-		this.hostElement = input;
-		this.displayElement = display;
-		this.rawElement = input;
+		this.swapState = state;
 
-		this.swapState.createdDisplay = display;
+		// elements更新
+		this.hostElement = input;      // raw
+		this.displayElement = display; // display
+		this.rawElement = input;
 
 		// revert 機構
 		this.lastAcceptedValue = display.value;
@@ -512,10 +463,10 @@ class InputGuard {
 
 		// rawは元の input（hidden化されている）
 		const raw = /** @type {HTMLInputElement} */ (this.hostElement);
-		const display = state.createdDisplay;
 
 		// displayが存在するなら、最新表示値をrawに同期してから消す（安全策）
 		// ※ rawは常に正規化済みを持つ設計だけど、念のため
+		const display = state.createdDisplay;
 		if (display) {
 			try {
 				raw.value = raw.value || display.value;
@@ -525,39 +476,18 @@ class InputGuard {
 		}
 
 		// display削除
-		if (display && display.parentNode) {
-			display.parentNode.removeChild(display);
-		}
+		state.removeDisplay();
 
 		// rawを元に戻す（type）
-		raw.type = state.originalType;
-
-		// id を戻す
-		if (state.originalId) {
-			raw.setAttribute("id", state.originalId);
-		} else {
-			raw.removeAttribute("id");
-		}
-
-		// name を戻す（swap中は残している想定だが、念のため）
-		if (state.originalName) {
-			raw.setAttribute("name", state.originalName);
-		} else {
-			raw.removeAttribute("name");
-		}
-
-		// class を戻す
-		raw.className = state.originalClass ?? "";
-
-		// data属性（tig用）は消しておく
-		delete raw.dataset.tigRole;
-		delete raw.dataset.tigOriginalId;
-		delete raw.dataset.tigOriginalName;
+		state.restoreRaw(raw);
 
 		// elements参照を original に戻す
 		this.hostElement = this.originalElement;
 		this.displayElement = this.originalElement;
 		this.rawElement = null;
+
+		// swapState破棄
+		this.swapState = null;
 	}
 
 	/**
@@ -569,8 +499,6 @@ class InputGuard {
 		this.unbindEvents();
 		// swap復元
 		this.restoreSeparateValue();
-		// swapState破棄
-		this.swapState = null;
 		// 以後このインスタンスは利用不能にしてもいいが、今回は明示しない
 	}
 
@@ -1082,9 +1010,14 @@ class InputGuard {
 	 * @returns {string}
 	 */
 	getRawValue() {
-		if (this.rawElement) {
-			return this.rawElement.value;
-		}
+		return /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.hostElement).value;
+	}
+
+	/**
+	 * 表示用の値を返す（displayの値）
+	 * @returns {string}
+	 */
+	getDisplayValue() {
 		return /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement).value;
 	}
 
@@ -1099,6 +1032,8 @@ class InputGuard {
 			isValid: () => this.isValid(),
 			getErrors: () => this.getErrors(),
 			getRawValue: () => this.getRawValue(),
+			getDisplayValue: () => this.getDisplayValue(),
+			getRawElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.hostElement),
 			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement)
 		};
 	}
