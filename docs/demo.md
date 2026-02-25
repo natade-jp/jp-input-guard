@@ -13,7 +13,7 @@ import { withBase } from 'vitepress'
 
 <iframe
   :src="withBase('/demo/attach-test1.html')"
-  style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
+  style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
 ```js
@@ -41,10 +41,11 @@ attach(input, {
 
 全角は半角化、マイナス許可、小数点許可、桁数制限あり。
 制限を超えた場合、入力できないようにする。
+値の初期値を設定。
 
 <iframe
   :src="withBase('/demo/attach-test2.html')"
-  style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
+  style="width: 100%; height: 240px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
 ```js
@@ -66,16 +67,18 @@ const guard = attach(input, {
 		rules.comma()
 	]
 });
+guard.setValue("123.45");
 ```
 
 ### 例3
 
 全角は半角化、マイナス不許可、小数点許可、桁数制限あり。
 空は不許可かつ、必ず小数点を付ける。
+値の初期値を設定。
 
 <iframe
   :src="withBase('/demo/attach-test3.html')"
-  style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
+  style="width: 100%; height: 240px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
 ```js
@@ -99,6 +102,7 @@ const guard = attach(input, {
 		rules.comma()
 	]
 });
+guard.setValue();
 ```
 
 ## attachAll
@@ -107,7 +111,7 @@ const guard = attach(input, {
 
 <iframe
   :src="withBase('/demo/attach-all.html')"
-  style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
+  style="width: 100%; height: 400px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
 ```js
@@ -128,7 +132,7 @@ const guard = guards.getGuards()[0];
 
 <iframe
   :src="withBase('/demo/auto-attach.html')"
-  style="width: 100%; height: 300px; border: 1px solid #ddd; border-radius: 0px;"
+  style="width: 100%; height: 240px; border: 1px solid #ddd; border-radius: 0px;"
 ></iframe>
 
 ```html

@@ -67,6 +67,21 @@ type TigError = {
     detail?: any;
 };
 /**
+ * setValue で設定できる値型
+ * - number は String に変換して設定する
+ * - null/undefined は空文字として扱う
+ */
+type SetValueInput = string | number | null | undefined;
+/**
+ * setValue 実行モード
+ * - "commit"  確定評価まで実行 normalize→validate→fix→format
+ * - "input"   入力中評価のみ実行 normalize→validate
+ * - "none"    評価は実行しない 値だけを反映
+ *
+ * 既定値は "commit"
+ */
+type SetValueMode = "none" | "input" | "commit";
+/**
  * attach() が返す公開API（利用者が触れる最小インターフェース）
  */
 type Guard = {
@@ -98,6 +113,15 @@ type Guard = {
      * - ユーザーが実際に操作している要素（swap時はdisplay専用）
      */
     getDisplayElement: () => HTMLInputElement | HTMLTextAreaElement;
+    /**
+     * 入力中評価を手動実行 normalize→validate
+     */
+    evaluate: () => void;
+    /**
+     * 確定評価を手動実行 normalize→validate→fix→format
+     */
+    commit: () => void;
+    setValue: (value: SetValueInput, mode?: SetValueMode) => void;
 };
 /**
  * 各ルールに渡される実行コンテキスト
@@ -239,4 +263,4 @@ type RevertRequest = {
 };
 
 export { attach, attachAll };
-export type { AttachOptions, ElementKind, Guard, GuardContext, GuardGroup, PhaseName, RevertRequest, Rule, SelectionState, SeparateValueOptions, TigError };
+export type { AttachOptions, ElementKind, Guard, GuardContext, GuardGroup, PhaseName, RevertRequest, Rule, SelectionState, SeparateValueOptions, SetValueInput, SetValueMode, TigError };

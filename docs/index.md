@@ -67,6 +67,8 @@ const guard = attach(input, {
 
 `attach()` が返す `Guard` は、利用者が触れる公開インターフェースです。
 
+#### 解除・エラー確認・値取得
+
 - `detach()`
   ガード解除（イベント削除・swap復元）
 
@@ -98,6 +100,54 @@ if (!guard.isValid()) {
 
 const raw = guard.getRawValue();
 const display = guard.getDisplayValue();
+```
+
+#### 手動評価・値設定
+
+外部から値を変更した場合や、blurせずに確定処理を行いたい場合のために、以下のメソッドが利用できます。
+
+- `evaluate()`
+  入力中評価を手動実行します
+  `normalize → validate` を実行します
+
+- `commit()`
+  確定評価を手動実行します
+  `normalize → validate → fix → format` を実行します
+  blur相当の処理です
+
+- `setValue(value, mode?)`
+  表示値をプログラムから設定します
+    - `value`
+      `string | number | null | undefined` を指定できます
+      `null / undefined` は空文字として扱われます
+
+    - `mode`
+      `"none" | "input" | "commit"`
+      既定値は `"commit"`
+        - `"commit"`
+          値を設定後、確定評価まで実行します
+        - `"input"`
+          値を設定後、入力中評価のみ実行します
+        - `"none"`
+          評価は実行せず、値のみを反映します
+
+例：
+
+```js
+// 値を設定して確定評価まで実行（既定は commit）
+guard.setValue(1234);
+
+// 入力中評価のみ
+guard.setValue("0012", "input");
+
+// 値だけ変更（評価なし）
+guard.setValue("", "none");
+
+// 手動で確定評価だけ実行
+guard.commit();
+
+// 入力中評価だけ実行
+guard.evaluate();
 ```
 
 ### 2) attachAll（複数要素にまとめて適用）

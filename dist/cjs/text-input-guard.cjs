@@ -275,6 +275,24 @@ class SwapState {
  */
 
 /**
+ * setValue で設定できる値型
+ * - number は String に変換して設定する
+ * - null/undefined は空文字として扱う
+ * @typedef {string | number | null | undefined} SetValueInput
+ */
+
+/**
+ * setValue 実行モード
+ * - "commit"  確定評価まで実行 normalize→validate→fix→format
+ * - "input"   入力中評価のみ実行 normalize→validate
+ * - "none"    評価は実行しない 値だけを反映
+ *
+ * 既定値は "commit"
+ *
+ * @typedef {"none"|"input"|"commit"} SetValueMode
+ */
+
+/**
  * attach() が返す公開API（利用者が触れる最小インターフェース）
  * @typedef {Object} Guard
  * @property {() => void} detach - ガード解除（イベント削除・swap復元）
@@ -284,6 +302,9 @@ class SwapState {
  * @property {() => string} getDisplayValue - ユーザーが実際に操作している要素の値を取得
  * @property {() => HTMLInputElement|HTMLTextAreaElement} getRawElement - 送信用の正規化済み値の要素
  * @property {() => HTMLInputElement|HTMLTextAreaElement} getDisplayElement - ユーザーが実際に操作している要素（swap時はdisplay専用）
+ * @property {() => void} evaluate 入力中評価を手動実行 normalize→validate
+ * @property {() => void} commit 確定評価を手動実行 normalize→validate→fix→format
+ * @property {(value: SetValueInput, mode?: SetValueMode) => void} setValue
  */
 
 /**
@@ -1264,6 +1285,42 @@ class InputGuard {
 	}
 
 	/**
+	 * 表示要素の値をプログラムから設定する
+	 *
+	 * @param {SetValueInput} value
+	 * @param {SetValueMode} [mode="commit"]
+	 * @returns {void}
+	 */
+	setValue(value, mode = "commit") {
+		/** @type {string} */
+		let s;
+
+		if (value == null) {
+			s = "";
+		} else if (typeof value === "number") {
+		// NaN/Infinity は事故りやすいので空に寄せる（方針）
+			s = Number.isFinite(value) ? String(value) : "";
+		} else {
+			s = String(value);
+		}
+
+		const display = /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement);
+		display.value = s;
+
+		if (mode === "none") {
+			this.syncRaw(s);
+			this.lastAcceptedValue = s;
+			this.lastAcceptedSelection = this.readSelection(display);
+			return;
+		}
+		if (mode === "input") {
+			this.evaluateInput();
+			return;
+		}
+		this.evaluateCommit();
+	}
+
+	/**
 	 * 外部に公開する Guard API を生成して返す
 	 * - InputGuard 自体を公開せず、最小の操作だけを渡す
 	 * @returns {Guard}
@@ -1276,7 +1333,10 @@ class InputGuard {
 			getRawValue: () => this.getRawValue(),
 			getDisplayValue: () => this.getDisplayValue(),
 			getRawElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.hostElement),
-			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement)
+			getDisplayElement: () => /** @type {HTMLInputElement|HTMLTextAreaElement} */ (this.displayElement),
+			evaluate: () => this.evaluateInput(),
+			commit: () => this.evaluateCommit(),
+			setValue: (value, mode) => this.setValue(value, mode)
 		};
 	}
 }
@@ -2341,11 +2401,11 @@ const rules = {
 
 /**
  * バージョン（ビルド時に置換したいならここを差し替える）
- * 例: rollup replace で ""0.1.0"" を package.json の version に置換
+ * 例: rollup replace で ""0.1.2"" を package.json の version に置換
  */
 // @ts-ignore
 // eslint-disable-next-line no-undef
-const version = "0.1.0" ;
+const version = "0.1.2" ;
 
 exports.attach = attach;
 exports.attachAll = attachAll;
