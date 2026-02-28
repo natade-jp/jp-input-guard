@@ -29,6 +29,7 @@ import { parseDatasetBool } from "./_dataset.js";
  * @returns {import("../text-input-guard.js").Rule}
  */
 export function numeric(options = {}) {
+	/** @type {NumericRuleOptions} */
 	const opt = {
 		allowFullWidth: options.allowFullWidth ?? true,
 		allowMinus: options.allowMinus ?? false,

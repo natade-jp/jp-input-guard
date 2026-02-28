@@ -11,10 +11,17 @@ const guard = attach(input, {
 			allowDecimal: true
 		}),
 		rules.digits({
-			int: 4,
-			frac: 2,
+			int: 8,
+			frac: 4,
 			overflowInputInt: "block",
 			overflowInputFrac: "block"
+		}),
+		rules.prefix({
+			text: "¥",
+			showWhenEmpty: true
+		}),
+		rules.suffix({
+			text: " JPY"
 		}),
 		rules.comma()
 	]

@@ -693,7 +693,7 @@ class InputGuard {
 	applySeparateValue() {
 		const userMode = this.options.separateValue?.mode ?? "auto";
 
-		// autoの場合：format系ルールがあるときだけswap
+		// autoの場合：format系ルールがあるときだけswap (つまり input を作成する)
 		const mode =
 		userMode === "auto"
 			? (this.formatRules.length > 0 ? "swap" : "off")
@@ -1615,6 +1615,7 @@ class InputGuardAutoAttach {
  * @returns {Rule}
  */
 function numeric(options = {}) {
+	/** @type {NumericRuleOptions} */
 	const opt = {
 		allowFullWidth: options.allowFullWidth ?? true,
 		allowMinus: options.allowMinus ?? false,
@@ -2053,6 +2054,7 @@ function roundFraction(intPart, fracPart, fracLimit) {
  * @returns {Rule}
  */
 function digits(options = {}) {
+	/** @type {DigitsRuleOptions} */
 	const opt = {
 		int: typeof options.int === "number" ? options.int : undefined,
 		frac: typeof options.frac === "number" ? options.frac : undefined,
@@ -6037,43 +6039,98 @@ class Mojix {
 
 
 /**
- * 半角を全角に変換するルール
+ * kana ルールのオプション
+ * @typedef {Object} KanaRuleOptions
+ * @property {"katakana-full"|"katakana-half"|"hiragana"} [target="katakana-full"] - 統一先
+ * @property {boolean} [nfkc=true] - 事前に Unicode NFKC 正規化を行う（合体文字などを正規化）
+ */
+
+/**
+ * kana ルールを生成する
+ * @param {KanaRuleOptions} [options]
  * @returns {Rule}
  */
-function zenkaku() {
+function kana(options = {}) {
+	/** @type {KanaRuleOptions} */
+	const opt = {
+		target: options.target ?? "katakana-full",
+		nfkc: options.nfkc ?? true
+	};
+
 	return {
-		name: "zenkaku",
+		name: "kana",
 		targets: ["input", "textarea"],
 
 		/**
-		 * 文字単位の正規化
-		 *
+		 * かな種別の正規化（入力中に都度かける）
+		 * - (任意) NFKC 正規化
+		 * - Mojix で target へ統一（ここは差し替え）
 		 * @param {string} value
+		 * @param {GuardContext} ctx
 		 * @returns {string}
 		 */
-		normalizeChar(value) {
-			return Mojix.toFullWidth(value);
+		normalizeChar(value, ctx) {
+			let s = String(value);
+			if (opt.nfkc) {
+				// 古い環境で normalize が無い可能性もあるので安全に
+				try {
+					s = s.normalize("NFKC");
+				} catch {
+					// noop
+				}
+			}
+			s = Mojix.toKatakana(s);
+			if (opt.target === "katakana-full") {
+				s = Mojix.toFullWidthKana(s);
+			} else if (opt.target === "katakana-half") {
+				s = Mojix.toHalfWidthKana(s);
+			} else {
+				s = Mojix.toFullWidthKana(s);
+				s = Mojix.toHiragana(s);
+			}
+			return s;
 		}
 	};
 }
 
 /**
- * datasetから zenkaku ルールを生成する
- * - data-tig-rules-zenkaku が無ければ null
+ * datasetから kana ルールを生成する
+ * - data-tig-rules-kana が無ければ null
+ * - オプションは data-tig-rules-kana-xxx から読む
  *
  * 対応する data 属性（dataset 名）
- * - data-tig-rules-zenkaku -> dataset.tigRulesZenkaku
+ * - data-tig-rules-kana               -> dataset.tigRulesKana
+ * - data-tig-rules-kana-target        -> dataset.tigRulesKanaTarget
+ * - data-tig-rules-kana-nfkc          -> dataset.tigRulesKanaNfkc
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
  * @returns {Rule|null}
  */
-zenkaku.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-tig-rules-zenkaku が無ければ対象外
-	if (dataset.tigRulesZenkaku == null) {
+kana.fromDataset = function fromDataset(dataset, _el) {
+	// ON判定
+	if (dataset.tigRulesKana == null) {
 		return null;
 	}
-	return zenkaku();
+
+	/** @type {KanaRuleOptions} */
+	const options = {};
+
+	const target = parseDatasetEnum(dataset.tigRulesKanaTarget, [
+		"katakana-full",
+		"katakana-half",
+		"hiragana"
+	]);
+	if (target != null) {
+		options.target = target;
+	}
+
+	const nfkc = parseDatasetBool(dataset.tigRulesKanaNfkc);
+	if (nfkc != null) {
+		options.nfkc = nfkc;
+	}
+
+	return kana(options);
 };
 
 /**
@@ -6088,43 +6145,78 @@ zenkaku.fromDataset = function fromDataset(dataset, _el) {
 
 
 /**
- * 全角を半角に変換するルール
+ * ascii ルールのオプション
+ * @typedef {Object} AsciiRuleOptions
+ * @property {boolean} [nfkc=true] - 事前に Unicode NFKC 正規化を行う
+ */
+
+/**
+ * ascii ルールを生成する
+ * - 全角英数字・記号・全角スペースを半角へ正規化する
+ * - カナは変換しない
+ *
+ * @param {AsciiRuleOptions} [options]
  * @returns {Rule}
  */
-function hankaku() {
+function ascii(options = {}) {
+	/** @type {AsciiRuleOptions} */
+	const opt = {
+		nfkc: options.nfkc ?? true
+	};
+
 	return {
-		name: "hankaku",
+		name: "ascii",
 		targets: ["input", "textarea"],
 
 		/**
-		 * 文字単位の正規化
-		 *
+		 * 英数字・記号の半角正規化
 		 * @param {string} value
+		 * @param {GuardContext} ctx
 		 * @returns {string}
 		 */
-		normalizeChar(value) {
-			return Mojix.toHalfWidth(value);
+		normalizeChar(value, ctx) {
+			let s = String(value);
+
+			if (opt.nfkc) {
+				try {
+					s = s.normalize("NFKC");
+				} catch {
+					// noop
+				}
+			}
+
+			s = Mojix.toHalfWidthAsciiCode(s);
+
+			return s;
 		}
 	};
 }
 
 /**
- * datasetから hankaku ルールを生成する
- * - data-tig-rules-hankaku が無ければ null
+ * datasetから ascii ルールを生成する
  *
- * 対応する data 属性（dataset 名）
- * - data-tig-rules-hankaku -> dataset.tigRulesHankaku
+ * 対応する data 属性
+ * - data-tig-rules-ascii
+ * - data-tig-rules-ascii-nfkc
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
  * @returns {Rule|null}
  */
-hankaku.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-tig-rules-hankaku が無ければ対象外
-	if (dataset.tigRulesHankaku == null) {
+ascii.fromDataset = function fromDataset(dataset, _el) {
+	if (dataset.tigRulesAscii == null) {
 		return null;
 	}
-	return hankaku();
+
+	/** @type {AsciiRuleOptions} */
+	const options = {};
+
+	const nfkc = parseDatasetBool(dataset.tigRulesAsciiNfkc);
+	if (nfkc != null) {
+		options.nfkc = nfkc;
+	}
+
+	return ascii(options);
 };
 
 /**
@@ -6137,45 +6229,88 @@ hankaku.fromDataset = function fromDataset(dataset, _el) {
  *  The MIT license https://opensource.org/licenses/MIT
  */
 
+/**
+ * prefix ルールのオプション
+ * @typedef {Object} PrefixRuleOptions
+ * @property {string} text - 先頭に付ける文字列
+ * @property {boolean} [showWhenEmpty=false] - 値が空でも表示するか
+ */
 
 /**
- * ひらがなをカタカナに変換するルール
+ * 先頭装飾（prefix）ルール
+ * - 表示用として先頭に文字列を付与する
+ * - 手動入力された同文字列は normalizeStructure で除去する
+ *
+ * @param {PrefixRuleOptions} options
  * @returns {Rule}
  */
-function katakana() {
+function prefix(options) {
+	/** @type {PrefixRuleOptions} */
+	const opt = {
+		text: options?.text ?? "",
+		showWhenEmpty: options?.showWhenEmpty ?? false
+	};
+
 	return {
-		name: "katakana",
-		targets: ["input", "textarea"],
+		name: "prefix",
+		targets: ["input"],
 
 		/**
-		 * 文字単位の正規化
-		 *
+		 * 手動入力された prefix を除去
 		 * @param {string} value
 		 * @returns {string}
 		 */
-		normalizeChar(value) {
-			return Mojix.toKatakana(value);
+		normalizeStructure(value) {
+			if (!opt.text) { return value; }
+
+			let s = String(value);
+
+			while (s.startsWith(opt.text)) {
+				s = s.slice(opt.text.length);
+			}
+
+			return s;
+		},
+
+		/**
+		 * 表示用整形
+		 * @param {string} value
+		 * @returns {string}
+		 */
+		format(value) {
+			if (!opt.text) { return value; }
+
+			if (!value) {
+				return opt.showWhenEmpty ? opt.text : value;
+			}
+
+			return opt.text + value;
 		}
 	};
 }
 
 /**
- * datasetから katakana ルールを生成する
- * - data-tig-rules-katakana が無ければ null
+ * datasetから prefix ルールを生成する
+ * - data-tig-rules-prefix が無ければ null
  *
  * 対応する data 属性（dataset 名）
- * - data-tig-rules-katakana -> dataset.tigRulesKatakana
+ * - data-tig-rules-prefix                  -> dataset.tigRulesPrefix
+ * - data-tig-rules-prefix-text             -> dataset.tigRulesPrefixText
+ * - data-tig-rules-prefix-show-when-empty  -> dataset.tigRulesPrefixShowWhenEmpty
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
  * @returns {Rule|null}
  */
-katakana.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-tig-rules-katakana が無ければ対象外
-	if (dataset.tigRulesKatakana == null) {
+prefix.fromDataset = function fromDataset(dataset, _el) {
+	if (dataset.tigRulesPrefix == null) {
 		return null;
 	}
-	return katakana();
+
+	return prefix({
+		text: dataset.tigRulesPrefixText ?? "",
+		showWhenEmpty: dataset.tigRulesPrefixShowWhenEmpty === "true"
+	});
 };
 
 /**
@@ -6188,45 +6323,88 @@ katakana.fromDataset = function fromDataset(dataset, _el) {
  *  The MIT license https://opensource.org/licenses/MIT
  */
 
+/**
+ * suffix ルールのオプション
+ * @typedef {Object} SuffixRuleOptions
+ * @property {string} text - 末尾に付ける文字列
+ * @property {boolean} [showWhenEmpty=false] - 値が空でも表示するか
+ */
 
 /**
- * カタカナをひらがなに変換するルール
+ * 末尾装飾（suffix）ルール
+ * - 表示用として末尾に文字列を付与する
+ * - 手動入力された同文字列は normalizeStructure で除去する
+ *
+ * @param {SuffixRuleOptions} options
  * @returns {Rule}
  */
-function hiragana() {
+function suffix(options) {
+	/** @type {SuffixRuleOptions} */
+	const opt = {
+		text: options?.text ?? "",
+		showWhenEmpty: options?.showWhenEmpty ?? false
+	};
+
 	return {
-		name: "hiragana",
-		targets: ["input", "textarea"],
+		name: "suffix",
+		targets: ["input"],
 
 		/**
-		 * 文字単位の正規化
-		 *
+		 * 手動入力された suffix を除去
 		 * @param {string} value
 		 * @returns {string}
 		 */
-		normalizeChar(value) {
-			return Mojix.toHiragana(value);
+		normalizeStructure(value) {
+			if (!opt.text) { return value; }
+
+			let s = String(value);
+
+			while (s.endsWith(opt.text)) {
+				s = s.slice(0, -opt.text.length);
+			}
+
+			return s;
+		},
+
+		/**
+		 * 表示用整形
+		 * @param {string} value
+		 * @returns {string}
+		 */
+		format(value) {
+			if (!opt.text) { return value; }
+
+			if (!value) {
+				return opt.showWhenEmpty ? opt.text : value;
+			}
+
+			return value + opt.text;
 		}
 	};
 }
 
 /**
- * datasetから hiragana ルールを生成する
- * - data-tig-rules-hiragana が無ければ null
+ * datasetから suffix ルールを生成する
+ * - data-tig-rules-suffix が無ければ null
  *
  * 対応する data 属性（dataset 名）
- * - data-tig-rules-hiragana -> dataset.tigRulesHiragana
+ * - data-tig-rules-suffix                  -> dataset.tigRulesSuffix
+ * - data-tig-rules-suffix-text             -> dataset.tigRulesSuffixText
+ * - data-tig-rules-suffix-show-when-empty  -> dataset.tigRulesSuffixShowWhenEmpty
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
  * @returns {Rule|null}
  */
-hiragana.fromDataset = function fromDataset(dataset, _el) {
-	// ON判定：data-tig-rules-hiragana が無ければ対象外
-	if (dataset.tigRulesHiragana == null) {
+suffix.fromDataset = function fromDataset(dataset, _el) {
+	if (dataset.tigRulesSuffix == null) {
 		return null;
 	}
-	return hiragana();
+
+	return suffix({
+		text: dataset.tigRulesSuffixText ?? "",
+		showWhenEmpty: dataset.tigRulesSuffixShowWhenEmpty === "true"
+	});
 };
 
 /**
@@ -6297,10 +6475,10 @@ const auto = new InputGuardAutoAttach(attach, [
 	{ name: "numeric", fromDataset: numeric.fromDataset },
 	{ name: "digits", fromDataset: digits.fromDataset },
 	{ name: "comma", fromDataset: comma.fromDataset },
-	{ name: "katakana", fromDataset: katakana.fromDataset },
-	{ name: "hiragana", fromDataset: hiragana.fromDataset },
-	{ name: "zenkaku", fromDataset: zenkaku.fromDataset },
-	{ name: "hankaku", fromDataset: hankaku.fromDataset },
+	{ name: "kana", fromDataset: kana.fromDataset },
+	{ name: "ascii", fromDataset: ascii.fromDataset },
+	{ name: "prefix", fromDataset: prefix.fromDataset },
+	{ name: "suffix", fromDataset: suffix.fromDataset },
 	{ name: "trim", fromDataset: trim.fromDataset }
 ]);
 
@@ -6317,10 +6495,10 @@ const rules = {
 	numeric,
 	digits,
 	comma,
-	zenkaku,
-	hankaku,
-	katakana,
-	hiragana,
+	kana,
+	ascii,
+	prefix,
+	suffix,
 	trim
 };
 
@@ -6332,16 +6510,16 @@ const rules = {
 // eslint-disable-next-line no-undef
 const version = "0.1.3" ;
 
+exports.ascii = ascii;
 exports.attach = attach;
 exports.attachAll = attachAll;
 exports.autoAttach = autoAttach;
 exports.comma = comma;
 exports.digits = digits;
-exports.hankaku = hankaku;
-exports.hiragana = hiragana;
-exports.katakana = katakana;
+exports.kana = kana;
 exports.numeric = numeric;
+exports.prefix = prefix;
 exports.rules = rules;
+exports.suffix = suffix;
 exports.trim = trim;
 exports.version = version;
-exports.zenkaku = zenkaku;

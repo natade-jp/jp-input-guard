@@ -435,7 +435,7 @@ class InputGuard {
 	applySeparateValue() {
 		const userMode = this.options.separateValue?.mode ?? "auto";
 
-		// autoの場合：format系ルールがあるときだけswap
+		// autoの場合：format系ルールがあるときだけswap (つまり input を作成する)
 		const mode =
 		userMode === "auto"
 			? (this.formatRules.length > 0 ? "swap" : "off")
