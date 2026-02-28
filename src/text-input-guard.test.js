@@ -50,7 +50,7 @@ function ruleNormalizeRemoveComma() {
 	};
 }
 
-test("auto swap: format ルールがあると input が hidden(raw) + display(text) に分離される", async () => {
+test("text-input-guard - auto swap: format ルールがあると input が hidden(raw) + display(text) に分離される", async () => {
 	setupDom("<input id=\"price\" name=\"price\" type=\"text\" value=\"1234\">");
 
 	// ここで import（setupDom 後ならどっちでもいいが、分かりやすくここで）
@@ -77,7 +77,7 @@ test("auto swap: format ルールがあると input が hidden(raw) + display(te
 	assert.equal(display.getAttribute("name"), null);
 });
 
-test("commit(blur): raw は format 前、display は format 後（swap + blur の基本動作）", async () => {
+test("text-input-guard - commit(blur): raw は format 前、display は format 後（swap + blur の基本動作）", async () => {
 	setupDom("<input id=\"price\" name=\"price\" type=\"text\" value=\"\">");
 
 	const { attach } = await import("./text-input-guard.js");
@@ -103,7 +103,7 @@ test("commit(blur): raw は format 前、display は format 後（swap + blur �
 	assert.equal(display.value, "1,234");
 });
 
-test("focus: format 済み表示を normalize で剥がして編集用に戻す（rawも同期）", async () => {
+test("text-input-guard - focus: format 済み表示を normalize で剥がして編集用に戻す（rawも同期）", async () => {
 	setupDom("<input id=\"price\" name=\"price\" type=\"text\" value=\"\">");
 
 	const { attach } = await import("./text-input-guard.js");

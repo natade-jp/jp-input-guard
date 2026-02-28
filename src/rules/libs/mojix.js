@@ -352,42 +352,6 @@ export default class Mojix {
 		return Japanese.toFullWidth(text);
 	}
 
-	/**
-	 * ローマ字からひらがなに変換
-	 * @param {string} text - 変換したいテキスト
-	 * @returns {string} 変換後のテキスト
-	 */
-	static toHiraganaFromRomaji(text) {
-		return Japanese.toHiraganaFromRomaji(text);
-	}
-
-	/**
-	 * ローマ字からカタカナに変換
-	 * @param {string} text - 変換したいテキスト
-	 * @returns {string} 変換後のテキスト
-	 */
-	static toKatakanaFromRomaji(text) {
-		return Japanese.toKatakanaFromRomaji(text);
-	}
-
-	/**
-	 * ひらがなからローマ字に変換
-	 * @param {string} text - 変換したいテキスト
-	 * @returns {string} 変換後のテキスト
-	 */
-	static toRomajiFromHiragana(text) {
-		return Japanese.toRomajiFromHiragana(text);
-	}
-
-	/**
-	 * カタカナからローマ字に変換
-	 * @param {string} text - 変換したいテキスト
-	 * @returns {string} 変換後のテキスト
-	 */
-	static toRomajiFromKatakana(text) {
-		return Japanese.toRomajiFromKatakana(text);
-	}
-
 	// ---------------------------------
 	// 1つの文字データに対して調査を行う
 	// ---------------------------------

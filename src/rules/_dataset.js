@@ -54,4 +54,39 @@ function parseDatasetEnum(v, allowed) {
 	return /** @type {T|undefined} */ (allowed.includes(/** @type {any} */ (s)) ? s : undefined);
 }
 
-export { parseDatasetBool, parseDatasetNumber, parseDatasetEnum };
+/**
+ * enum のカンマ区切り複数指定を解釈する（未指定なら undefined）
+ * - 未指定なら undefined
+ * - 空要素は無視
+ * - allowed に含まれないものは除外
+ *
+ * 例:
+ * - "a,b,c" -> ["a","b","c"]（allowed に含まれるもののみ）
+ * - "" / "   " -> undefined
+ * - "x,y"（どちらも allowed 外）-> []
+ *
+ * @template {string} T
+ * @param {string|undefined} v
+ * @param {readonly T[]} allowed
+ * @returns {T[]|undefined}
+ */
+function parseDatasetEnumList(v, allowed) {
+	if (v == null) { return; }
+	const s = String(v).trim();
+	if (s === "") { return; }
+
+	/** @type {string[]} */
+	const list = s
+		.split(",")
+		.map((x) => x.trim())
+		.filter(Boolean);
+
+	const result = list.filter(
+		/** @returns {x is T} */
+		(x) => allowed.includes(/** @type {any} */ (x))
+	);
+
+	return /** @type {T[]} */ (result);
+}
+
+export { parseDatasetBool, parseDatasetNumber, parseDatasetEnum, parseDatasetEnumList };

@@ -21,7 +21,7 @@ function setupDom(html = "<input id=\"price\" name=\"price\" type=\"text\" value
 	return dom;
 }
 
-test("constructor: UI属性 aria-* data-*（tig以外）をスナップショットする", async () => {
+test("swap-state - constructor: UI属性 aria-* data-*（tig以外）をスナップショットする", async () => {
 	setupDom(`
 		<input
 			id="price"
@@ -76,7 +76,7 @@ test("constructor: UI属性 aria-* data-*（tig以外）をスナップショッ
 	assert.equal(state.originalDataset.tigRules, undefined); // data-tig-rules は dataset.tigRules だが除外される
 });
 
-test("applyToRaw: input を hidden(raw) 化して id を外し tig dataset を付与する", async () => {
+test("swap-state - applyToRaw: input を hidden(raw) 化して id を外し tig dataset を付与する", async () => {
 	setupDom("<input id=\"price\" name=\"price\" type=\"text\" class=\"x\" value=\"1234\">");
 
 	const { SwapState } = await import("./swap-state.js");
@@ -93,7 +93,7 @@ test("applyToRaw: input を hidden(raw) 化して id を外し tig dataset を�
 	assert.equal(raw.dataset.tigOriginalName, "price");
 });
 
-test("createDisplay: display(text) を生成し id/class/value と UI属性 aria-* data-* を反映する", async () => {
+test("swap-state - createDisplay: display(text) を生成し id/class/value と UI属性 aria-* data-* を反映する", async () => {
 	setupDom(`
 		<input
 			id="price"
@@ -149,7 +149,7 @@ test("createDisplay: display(text) を生成し id/class/value と UI属性 aria
 	assert.equal(display.dataset.tigOriginalId, undefined);
 });
 
-test("removeDisplay: DOM から display を削除する", async () => {
+test("swap-state - removeDisplay: DOM から display を削除する", async () => {
 	const dom = setupDom("<input id=\"price\" name=\"price\" type=\"text\" value=\"1234\">");
 
 	const { SwapState } = await import("./swap-state.js");
@@ -167,7 +167,7 @@ test("removeDisplay: DOM から display を削除する", async () => {
 	assert.equal(dom.window.document.getElementById("price"), raw);
 });
 
-test("restoreRaw: type/id/name/class を復元し tig dataset を削除する", async () => {
+test("swap-state - restoreRaw: type/id/name/class を復元し tig dataset を削除する", async () => {
 	setupDom("<input id=\"price\" name=\"price\" type=\"text\" class=\"x y\" value=\"1234\">");
 
 	const { SwapState } = await import("./swap-state.js");

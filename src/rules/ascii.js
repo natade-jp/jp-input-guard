@@ -9,28 +9,15 @@
  */
 
 import Mojix from "./libs/mojix.js";
-import { parseDatasetBool } from "./_dataset.js";
-
-/**
- * ascii ルールのオプション
- * @typedef {Object} AsciiRuleOptions
- * @property {boolean} [nfkc=true] - 事前に Unicode NFKC 正規化を行う
- */
 
 /**
  * ascii ルールを生成する
  * - 全角英数字・記号・全角スペースを半角へ正規化する
  * - カナは変換しない
  *
- * @param {AsciiRuleOptions} [options]
  * @returns {import("../text-input-guard.js").Rule}
  */
-export function ascii(options = {}) {
-	/** @type {AsciiRuleOptions} */
-	const opt = {
-		nfkc: options.nfkc ?? true
-	};
-
+export function ascii() {
 	return {
 		name: "ascii",
 		targets: ["input", "textarea"],
@@ -42,19 +29,8 @@ export function ascii(options = {}) {
 		 * @returns {string}
 		 */
 		normalizeChar(value, ctx) {
-			let s = String(value);
-
-			if (opt.nfkc) {
-				try {
-					s = s.normalize("NFKC");
-				} catch {
-					// noop
-				}
-			}
-
-			s = Mojix.toHalfWidthAsciiCode(s);
-
-			return s;
+			const s = String(value);
+			return Mojix.toHalfWidthAsciiCode(s);
 		}
 	};
 }
@@ -64,7 +40,6 @@ export function ascii(options = {}) {
  *
  * 対応する data 属性
  * - data-tig-rules-ascii
- * - data-tig-rules-ascii-nfkc
  *
  * @param {DOMStringMap} dataset
  * @param {HTMLInputElement|HTMLTextAreaElement} _el
@@ -74,14 +49,5 @@ ascii.fromDataset = function fromDataset(dataset, _el) {
 	if (dataset.tigRulesAscii == null) {
 		return null;
 	}
-
-	/** @type {AsciiRuleOptions} */
-	const options = {};
-
-	const nfkc = parseDatasetBool(dataset.tigRulesAsciiNfkc);
-	if (nfkc != null) {
-		options.nfkc = nfkc;
-	}
-
-	return ascii(options);
+	return ascii();
 };
