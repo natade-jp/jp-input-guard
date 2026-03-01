@@ -5,9 +5,10 @@ export default {
 	themeConfig: {
 		nav: [
 			{ text: "Home", link: "/" },
-			{ text: "Concept", link: "/concept" },
-			{ text: "Rules", link: "/rules" },
+			{ text: "Getting Started", link: "/getting-started" },
 			{ text: "Demo", link: "/demo" },
+			{ text: "API", link: "/api" },
+			{ text: "Advanced", link: "/advanced" },
 			{ text: "npm", link: "https://www.npmjs.com/package/text-input-guard" }
 		],
 		socialLinks: [
